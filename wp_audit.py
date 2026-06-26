@@ -122,7 +122,7 @@ class SiteAuditResult:
             return "none"
         min_v = 4
         for v in self.vulnerable_components:
-            sev = SEVERITY_ORDER.get(v.severity_label, 99)
+            sev = SEVERITY_ORDER.get(v.highest_severity, 99)
             if sev < min_v:
                 min_v = sev
         return list(SEVERITY_ORDER.keys())[min_v]
