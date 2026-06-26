@@ -1,0 +1,7 @@
+sites:
+  - name: "WordPress Blog"
+    host: "localhost"
+    username: "root"
+    password: "root"
+    url: "https://localhost"
+    directory: "/var/www/html"
