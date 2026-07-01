@@ -66,7 +66,7 @@ def _vuln_table(vulns: list[Vulnerability]) -> str:
 def generate_report(result: SiteAuditResult, output_dir: Path) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     safe_name = re.sub(r"[^\w\-]", "_", result.name.lower())
-    filename = output_dir / f"audit_{safe_name}_{datetime.now().strftime('%Y%m%d')}.md"
+    filename = output_dir / f"[{result.highest_severity}]_audit_{safe_name}_{datetime.now().strftime('%Y%m%d')}.md"
 
     severity_color = {
         "critical": "🔴", "high": "🟠", "medium": "🟡",
