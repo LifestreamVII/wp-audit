@@ -2,6 +2,8 @@
 wp_detection.py — WordPress core/plugin/theme detection helpers via SSH.
 """
 
+import datetime
+from datetime import datetime as dt, timedelta, timezone
 import re
 from typing import Optional
 
@@ -171,3 +173,47 @@ def extract_plugins(client: paramiko.SSHClient, directory: str) -> Optional[dict
             name = slug
         plugins[slug] = name
     return plugins or None
+
+def filter_logs(client: paramiko.SSHClient, path: str, inc_notices: bool = False, td: int = 2) -> list[str]:
+    # Regex to extract the date string and the rest of the message.
+    # Matches: [01-Jul-2026 02:37:27 UTC] The rest of the log...
+    log_pattern = re.compile(r'^\[(.*?) UTC\]\s*(.*)$')
+
+    # Calculate the cutoff date (*timedelta* days ago from right now)
+    cutoff_date = dt.now(timezone.utc) - timedelta(days=td)
+
+    seen_messages = set()
+    extracted_logs = []
+
+    try:
+        sftp = client.open_sftp()
+
+        with sftp.open(path, 'r') as log_file:
+            for line in log_file:
+                # Exclude lines that don't have "Warning" or "Error"
+                if not inc_notices and "Warning" not in line and "Error" not in line:
+                    continue
+
+                match = log_pattern.match(line)
+                if match:
+                    date_str = match.group(1) # e.g., "01-Jul-2026 02:37:27"
+                    message_content = match.group(2) # e.g., "PHP Warning: ..."
+                    try:
+                        log_date = dt.strptime(date_str, '%d-%b-%Y %H:%M:%S')
+                        log_date = log_date.replace(tzinfo=timezone.utc)
+                        if not isinstance(log_date, dt):
+                            continue
+                        if log_date < cutoff_date:
+                            continue # Exclude results older than *timedelta* days
+                    except ValueError as ve:
+                        log.warning("  ✗ Failed to parse date in log line: %s", ve)
+                        continue
+                    if message_content not in seen_messages:
+                        seen_messages.add(message_content)
+                        extracted_logs.append(line.strip())
+    except Exception as e:
+        log.warning("  ✗ Error reading log file: %s", e)
+    finally:
+        if 'sftp' in locals():
+            sftp.close()
+    return extracted_logs

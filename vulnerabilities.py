@@ -45,7 +45,7 @@ def _parse_vulnerabilities(data: dict | None) -> list[Vulnerability]:
     return vulns
 
 
-def fetch_vulnerabilities(kind: str, slug: str) -> list[Vulnerability]:
+def fetch_vulnerabilities(kind: str, slug: str) -> list[Vulnerability] | None:
     """
     Fetch vulnerabilities for a plugin or theme from wpvulnerability.net.
     kind: "plugin" or "theme" or "core"
@@ -61,18 +61,18 @@ def fetch_vulnerabilities(kind: str, slug: str) -> list[Vulnerability]:
     if not resp:
         log.warning("  ✗ Could not reach wpvulnerability.net for %s/%s", kind, slug)
         _vuln_cache[cache_key] = []
-        return []
+        return None
 
     if resp.status_code == 404:
         _vuln_cache[cache_key] = []
-        return []
+        return None
 
     try:
         data = resp.json()
         if data.get("error") != 0:
             log.debug("  API error for %s/%s: %s", kind, slug, data.get("message"))
             _vuln_cache[cache_key] = []
-            return []
+            return None
         # API returns data: null when the component has no recorded entries
         payload = data.get("data")  # may be None or a dict
         vulns = _parse_vulnerabilities(payload)
@@ -81,7 +81,7 @@ def fetch_vulnerabilities(kind: str, slug: str) -> list[Vulnerability]:
     except (ValueError, KeyError) as e:
         log.warning("  ✗ Failed to parse vulnerability data for %s/%s: %s", kind, slug, e)
         _vuln_cache[cache_key] = []
-        return []
+        return None
 
 
 def filter_vulns_for_version(

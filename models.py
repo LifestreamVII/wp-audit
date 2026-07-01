@@ -65,6 +65,8 @@ class SiteAuditResult:
     reachable: bool
     error: Optional[str]
     wp_version: Optional[str]
+    logs: Optional[list[str]]
+    log_analysis: Optional[str]
     wp_version_source: str
     components: list[Component] = field(default_factory=list)
 

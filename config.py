@@ -27,6 +27,9 @@ WP_THEME_API_BASE = (
 )
 
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "none": 4, "unknown": 5}
+LLM_MODEL = "hf.co/michaelw9999/Qwopus3.6-27B-Coder-MTP-NVFP4-GGUF"  # Model for LLMClient
+LLM_BASE_URL = "http://localhost:11434/v1/"  # Base URL for LLMClient
+LLM_API_KEY = "ollama"
 
 # ---------------------------------------------------------------------------
 # Logging

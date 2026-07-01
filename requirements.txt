@@ -2,3 +2,4 @@ requests>=2.31.0
 pyyaml>=6.0
 paramiko>=5.0.0
 lxml>=5.0.0
+openai>=2.44.0

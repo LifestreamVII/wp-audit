@@ -121,6 +121,7 @@ def generate_report(result: SiteAuditResult, output_dir: Path) -> Path:
         f"| Vulnerable Components | **{vuln_count}** |",
         f"| Total Vulnerabilities | **{total_vulns}** |",
         f"| Highest Severity | {hs_emoji} **{hs.capitalize()}** |",
+        f"| Log Analysis | {('See below' if result.log_analysis else 'No analysis')} |",
         "",
     ]
 
@@ -243,6 +244,21 @@ def generate_report(result: SiteAuditResult, output_dir: Path) -> Path:
                     _vuln_table(comp.vulnerabilities),
                     "",
                 ]
+
+    lines += ["---", ""]
+
+    # ── Log Analysis ────────────────────────────────────────────────────
+    lines += ["## 📜 Log Analysis", ""]
+    if result.log_analysis:
+        lines += [
+            f"**Analysis Summary:** {result.log_analysis}",
+            "",
+        ]
+    else:
+        lines += [
+            "No log analysis available.",
+            "",
+        ]
 
     lines += ["---", ""]
 
