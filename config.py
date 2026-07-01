@@ -32,6 +32,18 @@ LLM_BASE_URL = "http://localhost:11434/v1/"  # Base URL for LLMClient
 LLM_API_KEY = "ollama"
 
 # ---------------------------------------------------------------------------
+# Email / SMTP
+# ---------------------------------------------------------------------------
+
+SMTP_HOST = ""         # SMTP server hostname
+SMTP_PORT = 587                      # SMTP port (587 = STARTTLS)
+SMTP_USER = ""   # SMTP login username
+SMTP_PASSWORD = ""  # SMTP login password / app-password
+EMAIL_SENDER = ""
+EMAIL_RECIPIENT = ""
+EMAIL_SUBJECT_PREFIX = "[WP-Audit] Security Report"
+
+# ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
 

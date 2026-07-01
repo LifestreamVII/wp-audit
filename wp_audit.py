@@ -22,6 +22,7 @@ import yaml
 
 from auditor import audit_site
 from config import DEFAULT_CONFIG, DEFAULT_OUTPUT_DIR, log
+from email_report import send_summary_email
 from reporter import generate_report
 
 
@@ -65,6 +66,10 @@ Examples:
         "--verbose", action="store_true",
         help="Enable debug-level logging",
     )
+    parser.add_argument(
+        "--no-email", action="store_true",
+        help="Skip sending the summary email",
+    )
     args = parser.parse_args()
 
     if args.verbose:
@@ -78,6 +83,7 @@ Examples:
     log.info("")
 
     generated_reports: list[Path] = []
+    errored_sites = 0
     for site in sites:
         name = site.get("name", site.get("host", "Unknown"))
         host = site.get("host", "")
@@ -87,8 +93,11 @@ Examples:
         url = site.get("url", f"https://{host}")
         if not host:
             log.warning("Skipping site with no host: %s", name)
+            errored_sites += 1
             continue
         result = audit_site(name, host, username, password, directory, url)
+        if not result.reachable or result.error:
+            errored_sites += 1
         report_path = generate_report(result, output_dir)
         generated_reports.append(report_path)
         log.info("  📄 Report saved: %s", report_path)
@@ -98,6 +107,17 @@ Examples:
     log.info("Audit complete. %d report(s) generated:", len(generated_reports))
     for p in generated_reports:
         log.info("  • %s", p)
+
+    # ── Summary email ─────────────────────────────────────────────────────
+    if not args.no_email:
+        send_summary_email(
+            generated_reports=generated_reports,
+            total_sites=len(sites),
+            errored_sites=errored_sites,
+            output_dir=output_dir,
+        )
+    else:
+        log.info("📧 Email sending skipped (--no-email).")
 
 
 if __name__ == "__main__":
