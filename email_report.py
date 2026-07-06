@@ -102,17 +102,21 @@ def _build_summary_body(
 ) -> str:
     """Build the plain-text email body."""
     date_str = analysis_dt.strftime("%d-%m-%Y %H:%M JST")
-
-    lines = [
-        f"Date of analysis : {date_str}",
-        f"Sites analysed : {total_sites}",
-        f"Sites skipped (errored) : {errored_sites}",
-        f"Sites skipped (no severity) : {no_severity_sites}",
-        "",
-        f"Reports available for : {', '.join(report_sites)}",
-    ]
-    return "\n".join(lines)
-
+    return f"""\
+    <html>
+    <body style="font-family: Arial, sans-serif; color: #333;">
+      <h2 style="color: #2980b9;">Backup Integrity Summary Report</h2>
+      <p><strong>Date of analysis:</strong> {date_str}</p>
+      <p><strong>Sites analysed:</strong> {total_sites}</p>
+      <p><strong>Sites skipped (errored):</strong> {errored_sites}</p>
+      <p><strong>Sites skipped (no severity):</strong> {no_severity_sites}</p>
+      <p><strong>Reports available for:</strong> {', '.join(report_sites)}</p>
+      <hr>
+      <p style="font-size: 0.85em; color: #888;">
+        This summary email was generated automatically by the wp-audit script.
+      </p>
+    </body>
+    </html>"""
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -193,7 +197,7 @@ def send_summary_email(
     msg["From"] = EMAIL_SENDER
     msg["To"] = EMAIL_RECIPIENT
     msg["Subject"] = f"{EMAIL_SUBJECT_PREFIX} {analysis_dt.strftime('%d-%m-%Y')}"
-    msg.attach(MIMEText(body, "plain", "utf-8"))
+    msg.attach(MIMEText(body, "html"))
 
     for pdf_path, att_name in zip(pdf_paths, attachment_names):
         with pdf_path.open("rb") as f:
