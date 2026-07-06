@@ -16,7 +16,7 @@ from wp_detection import detect_wp_version, extract_plugins, extract_themes, pro
 # Site auditor
 # ---------------------------------------------------------------------------
 
-def audit_site(name: str, host: str, username: str, password: str, directory: str, url: str) -> SiteAuditResult:
+def audit_site(name: str, host: str, username: str, password: str, directory: str, url: str, skip_logs: bool = False) -> SiteAuditResult:
     now = dt.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     log.info("━━━━ Auditing: %s (%s)", name, host)
 
@@ -154,7 +154,7 @@ def audit_site(name: str, host: str, username: str, password: str, directory: st
     client = client_connect(host, username, password)
     result.logs = filter_logs(client, f"{directory}/wp-content/debug.log", inc_notices=True, td=2)
     # ── 8. Logs Analysis (LLM) ───────────────────────────────────────────
-    if result.logs:
+    if result.logs and not skip_logs:
         log.info("  🧠 Analyzing logs with LLM…")
         llm_client = LLMClient(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
         llm_client.set_model(LLM_MODEL)

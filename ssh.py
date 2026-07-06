@@ -6,7 +6,7 @@ from typing import Optional
 
 import paramiko
 
-from config import CONNECTION_RETRIES, log
+from config import CONNECTION_RETRIES, SSH_PORT, log
 
 
 # ---------------------------------------------------------------------------
@@ -16,7 +16,7 @@ from config import CONNECTION_RETRIES, log
 def client_connect(host: str, user: str, password: str) -> paramiko.SSHClient:
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    client.connect(hostname=host, username=user, password=password, timeout=10, port=3211)
+    client.connect(hostname=host, username=user, password=password, timeout=10, port=SSH_PORT)
     return client
 
 

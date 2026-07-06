@@ -70,6 +70,10 @@ Examples:
         "--no-email", action="store_true",
         help="Skip sending the summary email",
     )
+    parser.add_argument(
+        "--no-logs", action="store_true",
+        help="Skip debug.log analysis and LLM summary (if configured)",
+    )
     args = parser.parse_args()
 
     if args.verbose:
@@ -95,7 +99,7 @@ Examples:
             log.warning("Skipping site with no host: %s", name)
             errored_sites += 1
             continue
-        result = audit_site(name, host, username, password, directory, url)
+        result = audit_site(name, host, username, password, directory, url, skip_logs=args.no_logs)
         if not result.reachable or result.error:
             errored_sites += 1
         report_path = generate_report(result, output_dir)

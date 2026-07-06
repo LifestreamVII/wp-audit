@@ -31,6 +31,8 @@ LLM_MODEL = "hf.co/michaelw9999/Qwopus3.6-27B-Coder-MTP-NVFP4-GGUF"  # Model for
 LLM_BASE_URL = "http://localhost:11434/v1/"  # Base URL for LLMClient
 LLM_API_KEY = "ollama"
 
+SSH_PORT = 3211  # SSH port for connecting to WordPress hosts
+
 # ---------------------------------------------------------------------------
 # Email / SMTP
 # ---------------------------------------------------------------------------
