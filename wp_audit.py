@@ -99,12 +99,39 @@ Examples:
             log.warning("Skipping site with no host: %s", name)
             errored_sites += 1
             continue
-        result = audit_site(name, host, username, password, directory, url, skip_logs=args.no_logs)
-        if not result.reachable or result.error:
+        
+        try:
+            result = audit_site(name, host, username, password, directory, url, skip_logs=args.no_logs)
+            if not result.reachable or result.error:
+                errored_sites += 1
+            report_path = generate_report(result, output_dir)
+            generated_reports.append(report_path)
+            log.info("  📄 Report saved: %s", report_path)
+        except Exception as exc:
+            log.error("  ✗ Unhandled error auditing %s: %s", name, exc)
+            log.exception(exc)
             errored_sites += 1
-        report_path = generate_report(result, output_dir)
-        generated_reports.append(report_path)
-        log.info("  📄 Report saved: %s", report_path)
+            # Create a minimal failed report
+            from models import SiteAuditResult
+            from datetime import datetime as dt, timezone
+            failed_result = SiteAuditResult(
+                name=name,
+                url=url,
+                audited_at=dt.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+                reachable=False,
+                error=f"Unhandled exception during audit: {exc}",
+                wp_version=None,
+                wp_version_source="not-detected",
+                logs=None,
+                log_analysis=None,
+            )
+            try:
+                report_path = generate_report(failed_result, output_dir)
+                generated_reports.append(report_path)
+                log.info("  📄 Error report saved: %s", report_path)
+            except Exception as report_exc:
+                log.error("  ✗ Could not generate error report: %s", report_exc)
+        
         log.info("")
 
     log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
