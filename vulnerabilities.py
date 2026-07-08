@@ -12,6 +12,73 @@ from models import Vulnerability
 
 
 # ---------------------------------------------------------------------------
+# Version comparison helpers
+# ---------------------------------------------------------------------------
+
+
+def _parse_version(v: str) -> tuple:
+    """Parse a version string into a comparable tuple.
+
+    Handles common WordPress version formats including pre-release
+    suffixes (alpha, beta, rc).  Pre-release versions sort before
+    their corresponding release version.
+    """
+    v = v.strip().lstrip("vV")
+
+    # Split into numeric parts and optional pre-release suffix.
+    # Examples:
+    #   "6.5.0"          -> ("6.5.0", None)
+    #   "6.5.0-beta2"    -> ("6.5.0", "beta2")
+    #   "6.5.0-rc1"      -> ("6.5.0", "rc1")
+    match = re.match(
+        r"^(\d+(?:\.\d+)*)(?:[-.]?(alpha|beta|rc|a|b)\d*)?",
+        v,
+        re.IGNORECASE,
+    )
+    if not match:
+        return (0,)
+
+    num_part = match.group(1)
+    pre_part = match.group(2)
+
+    nums = tuple(int(p) for p in num_part.split("."))
+
+    if not pre_part:
+        # Release version — pad with a large sentinel so it sorts
+        # after any pre-release for the same numeric base.
+        return nums + (9999,)
+    else:
+        # Pre-release version — a small number keeps it before the release.
+        pre_lower = pre_part.lower()
+        if pre_lower in ("alpha", "a"):
+            pre_order = 1
+        elif pre_lower in ("beta", "b"):
+            pre_order = 2
+        elif pre_lower == "rc":
+            pre_order = 3
+        else:
+            pre_order = 0
+        return nums + (pre_order,)
+
+
+def _operator_match(installed: tuple, constraint: tuple, operator: str) -> bool:
+    """Return True if *installed* satisfies ``installed <operator> constraint``."""
+    if operator == "lt":
+        return installed < constraint
+    elif operator == "le":
+        return installed <= constraint
+    elif operator == "eq":
+        return installed == constraint
+    elif operator == "gt":
+        return installed > constraint
+    elif operator == "ge":
+        return installed >= constraint
+    else:
+        # Unknown operator — be permissive and assume the constraint passes.
+        return True
+
+
+# ---------------------------------------------------------------------------
 # WPVulnerability.net API
 # ---------------------------------------------------------------------------
 
@@ -34,7 +101,9 @@ def _parse_vulnerabilities(data: dict | None) -> list[Vulnerability]:
             name=v.get("name", "Unknown"),
             description=v.get("description"),
             max_version=op.get("max_version"),
+            max_operator=op.get("max_operator", "lt"),
             min_version=op.get("min_version"),
+            min_operator=op.get("min_operator", "ge"),
             unfixed=op.get("unfixed", "0") == "1",
             sources=sources,
             cvss_score=float(cvss["score"]) if cvss.get("score") else None,
@@ -89,24 +158,17 @@ def filter_vulns_for_version(
 ) -> list[Vulnerability]:
     """
     Filter vulnerabilities that apply to the given installed version.
-    Uses simple semver-style comparison matching the API's operator semantics.
-    If version is None, return all (assume worst-case).
+
+    Uses the operator fields returned by the API (``max_operator`` /
+    ``min_operator``) to correctly decide whether *version* falls
+    within the vulnerable range.  If *version* is None, return all
+    vulnerabilities (assume worst-case).
     """
     if version is None:
         return vulns
 
-    def version_tuple(v: str):
-        """Convert version string to comparable tuple, ignoring non-numeric parts."""
-        parts = []
-        for p in re.split(r"[.\-]", v):
-            try:
-                parts.append(int(p))
-            except ValueError:
-                pass
-        return tuple(parts) or (0,)
-
     try:
-        installed = version_tuple(version)
+        installed = _parse_version(version)
     except Exception:
         return vulns
 
@@ -116,13 +178,8 @@ def filter_vulns_for_version(
         max_ok = True
         if vuln.max_version:
             try:
-                max_v = version_tuple(vuln.max_version)
-                op = "lt"  # default from API docs
-                # We derive the operator from the vulnerability name as fallback;
-                # the actual operator field is in the raw data — we stored it indirectly
-                # in the Vulnerability object via max_version presence.
-                # For simplicity, assume max_operator is "lt" (most common in the API).
-                max_ok = installed < max_v
+                max_v = _parse_version(vuln.max_version)
+                max_ok = _operator_match(installed, max_v, vuln.max_operator)
             except Exception:
                 max_ok = True
 
@@ -130,8 +187,8 @@ def filter_vulns_for_version(
         min_ok = True
         if vuln.min_version:
             try:
-                min_v = version_tuple(vuln.min_version)
-                min_ok = installed >= min_v
+                min_v = _parse_version(vuln.min_version)
+                min_ok = _operator_match(installed, min_v, vuln.min_operator)
             except Exception:
                 min_ok = True
 

@@ -17,7 +17,9 @@ class Vulnerability:
     name: str
     description: Optional[str]
     max_version: Optional[str]
+    max_operator: str = "lt"
     min_version: Optional[str]
+    min_operator: str = "ge"
     unfixed: bool
     sources: list[dict]
     cvss_score: Optional[float]
