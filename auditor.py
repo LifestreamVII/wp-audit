@@ -5,7 +5,7 @@ auditor.py — Core site audit orchestration for wp_audit.
 from datetime import datetime as dt, timezone
 from typing import Optional
 from ai import LLMClient
-from config import log, LLM_MODEL, LLM_BASE_URL, LLM_API_KEY
+from config import log, LLM_MODEL, LLM_BASE_URL, LLM_API_KEY, LLM_PROMPT
 from models import Component, SiteAuditResult
 from ssh import client_connect, establish_connection
 from vulnerabilities import fetch_vulnerabilities, filter_vulns_for_version
@@ -163,11 +163,11 @@ def audit_site(name: str, host: str, username: str, password: str, directory: st
             llm_client = LLMClient(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
             llm_client.set_model(LLM_MODEL)
             llm_client.set_sysprompt(
-                "You are a WordPress security expert. Analyze the following logs and provide a short summary (max 2800 chars. if there are a lot of problematic entries) stating potential security issues in the WordPress site. Stay concise and assume the reader is a security professional. If there is a solution, mention it briefly in one or two sentences. Do not provide any other information or commentary."
+                LLM_PROMPT
             )
             try:
                 log_summary = llm_client.generate(prompt=result.logs, max_tokens=4096)
-                result.log_analysis = log_summary
+                result.log_analysis = log_summary.replace('\n', ' ').replace('\r', '')
                 log.info("  ✓ Log analysis completed.")
                 
             except Exception as e:

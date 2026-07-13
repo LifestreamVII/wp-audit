@@ -99,7 +99,8 @@ def _parse_vulnerabilities(data: dict | None) -> list[Vulnerability]:
 
         vuln = Vulnerability(
             name=v.get("name", "Unknown"),
-            description=v.get("description"),
+            description=sources[0].get("description") if sources else v.get("description", "No description"),
+            link=sources[0].get("link") if sources else None,
             max_version=op.get("max_version"),
             max_operator=op.get("max_operator", "lt"),
             min_version=op.get("min_version"),

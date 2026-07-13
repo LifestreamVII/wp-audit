@@ -1,267 +1,261 @@
 """
-reporter.py — Markdown report generation for wp_audit.
+reporter.py — Markdown digest report generation for wp_audit.
+
+Generates a single digest report from a DiffResult, grouping issues
+by status (NEW → EXISTING → RESOLVED → UNCHANGED → ERRORS).
 """
 
 import re
+import time
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
-from config import SEVERITY_ORDER
-from models import SiteAuditResult, Vulnerability
+from config import SEVERITY_ORDER, log
+from state import DiffResult, Issue
 
 
 # ---------------------------------------------------------------------------
-# Markdown report generator
+# Severity helpers
 # ---------------------------------------------------------------------------
 
 SEVERITY_EMOJI = {
     "critical": "🔴",
-    "high": "🟠",
-    "medium": "🟡",
-    "low": "🔵",
-    "none": "🟢",
-    "unknown": "⚪",
+    "high":     "🟠",
+    "medium":   "🟡",
+    "low":      "🔵",
+    "none":     "🟢",
+    "unknown":  "⚪",
 }
 
+def _severity_sort_key(pair: tuple[str, Issue]) -> int:
+    """Sort (site, issue) pairs by severity (critical first)."""
+    return SEVERITY_ORDER.get(pair[1].severity, 99)
 
-def severity_badge(s: str) -> str:
-    emoji = SEVERITY_EMOJI.get(s.lower(), "⚪")
-    return f"{emoji} {s.capitalize()}"
+
+_CVE_RE = re.compile(r"CVE-\d{4}-\d{4,}", re.IGNORECASE)
 
 
-def _vuln_table(vulns: list[Vulnerability]) -> str:
-    if not vulns:
-        return ""
+def _extract_cve(issue: Issue) -> str:
+    """Extract CVE identifier from issue ID or detail, return '—' if none."""
+    m = _CVE_RE.search(issue.id)
+    if m:
+        return m.group(0).upper()
+    m = _CVE_RE.search(issue.detail)
+    if m:
+        return m.group(0).upper()
+    return "—"
+
+
+# ---------------------------------------------------------------------------
+# Section builders
+# ---------------------------------------------------------------------------
+
+def _header(
+    total_sites: int,
+    diff: DiffResult,
+    start_time: float,
+) -> list[str]:
+    """Title line + status badge bar."""
+    elapsed = time.time() - start_time
+    mins, secs = divmod(int(elapsed), 60)
+    duration = f"{mins}m {secs:02d}s" if mins else f"{secs}s"
+
     lines = [
-        "| CVSSv3 | Severity | Vulnerability | Affected Versions | CVE / ID |",
-        "|--------|----------|---------------|-------------------|----------|",
-    ]
-    for v in sorted(vulns, key=lambda x: SEVERITY_ORDER.get(x.severity_label, 99)):
-        score = f"`{v.cvss_score}`" if v.cvss_score else "N/A"
-        sev = severity_badge(v.severity_label)
-        name = v.name
-        version_range = ""
-        if v.min_version and v.max_version:
-            version_range = f"≥ {v.min_version} and < {v.max_version}"
-        elif v.max_version:
-            version_range = f"< {v.max_version}"
-        elif v.unfixed:
-            version_range = "⚠ Unfixed"
-        else:
-            version_range = "All versions"
-        # Pick first CVE reference if available
-        cve_links = []
-        for src in v.sources[:2]:
-            ref_id = src.get("id", "")
-            ref_link = src.get("link", "")
-            if ref_link:
-                cve_links.append(f"[{ref_id}]({ref_link})")
-            elif ref_id:
-                cve_links.append(ref_id)
-        ref_str = ", ".join(cve_links) if cve_links else "—"
-        lines.append(f"| {score} | {sev} | {name} | `{version_range}` | {ref_str} |")
-    return "\n".join(lines)
-
-
-def generate_report(result: SiteAuditResult, output_dir: Path) -> Path:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    safe_name = re.sub(r"[^\w\-]", "_", result.name.lower())
-    filename = output_dir / f"[{result.highest_severity}]_audit_{safe_name}_{datetime.now().strftime('%Y%m%d')}.md"
-
-    severity_color = {
-        "critical": "🔴", "high": "🟠", "medium": "🟡",
-        "low": "🔵", "none": "🟢", "unknown": "⚪",
-    }
-
-    lines: list[str] = []
-
-    # ── Title ─────────────────────────────────────────────────────────────
-    lines += [
-        f"# WordPress Security Audit: {result.name}",
+        "# 🛡 WordPress Security Audit Digest",
+        f"*{datetime.today().strftime('%Y-%m-%d')} — "
+        f"{total_sites} sites audited in {duration}*",
         "",
-        f"> **URL:** {result.url}  ",
-        f"> **Audited at:** {result.audited_at}  ",
-        f"> **Tool:** wp_audit.py (WPVulnerability.net API)",
+    ]
+
+    # Badge bar — only show categories that have entries
+    badges: list[str] = []
+    if diff.new:
+        badges.append(f"**[ 🔴 {len(diff.new)} new ]**")
+    if diff.existing:
+        badges.append(f"**[ 🟠 {len(diff.existing)} existing ]**")
+    if diff.resolved:
+        badges.append(f"**[ 🟢 {len(diff.resolved)} resolved ]**")
+    if diff.errored:
+        badges.append(f"**[ ⚫ {len(diff.errored)} errored ]**")
+    if badges:
+        lines.append(" | ".join(badges))
+        lines.append("")
+
+    lines += ["---", ""]
+    return lines
+
+
+def _section_new(diff: DiffResult) -> list[str]:
+    """🚨 NEW — Critical & High issues discovered this run."""
+    if not diff.new:
+        return []
+
+    items = sorted(diff.new, key=_severity_sort_key)
+
+    lines = [
+        f"## 🚨 NEW — {len(items)} New issues detected",
+        "",
+        "| Site | Component | CVE | Issue | Severity | Recommended Action |",
+        "| :--- | :--- | :--- | :--- | :--- | :--- |",
+    ]
+    for site, iss in items:
+        sev = SEVERITY_EMOJI.get(iss.severity, "⚪")
+        cve = _extract_cve(iss)
+        lines.append(
+            f"| **{site}** "
+            f"| **{iss.component}** "
+            f"| {f'[{cve}]({iss.link})' if iss.link else cve} "
+            f"| {iss.detail} "
+            f"| {sev} **{iss.severity.capitalize()}** "
+            f"| {iss.action} |"
+        )
+    lines += [
         "",
         "---",
         "",
     ]
+    return lines
 
-    if not result.reachable:
-        lines += [
-            "## ❌ Site Unreachable",
-            "",
-            f"**Error:** {result.error}",
-            "",
-        ]
-        report_text = "\n".join(lines)
-        filename.write_text(report_text, encoding="utf-8")
-        return filename
 
-    # ── Executive Summary ─────────────────────────────────────────────────
-    total = len(result.components)
-    vuln_count = len(result.vulnerable_components)
-    total_vulns = result.total_vulnerabilities
-    hs = result.highest_severity
-    hs_emoji = severity_color.get(hs, "⚪")
+def _section_existing(diff: DiffResult) -> list[str]:
+    """⏸ EXISTING — Previously reported, still open."""
+    if not diff.existing:
+        return []
 
-    # Severity counts
-    sev_counts: dict[str, int] = {s: 0 for s in SEVERITY_ORDER}
-    for comp in result.vulnerable_components:
-        for vuln in comp.vulnerabilities:
-            sev_counts[vuln.severity_label] = sev_counts.get(vuln.severity_label, 0) + 1
+    items = sorted(diff.existing, key=_severity_sort_key)
 
-    lines += [
-        "## 📋 Executive Summary",
+    lines = [
+        f"## ⏸ {len(items)} Previous issues (not resolved)",
         "",
-        f"| Item | Value |",
-        f"|------|-------|",
-        f"| WordPress Version | `{result.wp_version or 'Not detected'}` |",
-        f"| Components Detected | {total} |",
-        f"| Vulnerable Components | **{vuln_count}** |",
-        f"| Total Vulnerabilities | **{total_vulns}** |",
-        f"| Highest Severity | {hs_emoji} **{hs.capitalize()}** |",
-        f"| Log Analysis | {('See below' if result.log_analysis else 'No analysis')} |",
+        "| Site | Component | CVE | Issue | Severity | Recommended Action |",
+        "| :--- | :--- | :--- | :--- | :--- | :--- |",
+    ]
+    for site, iss in items:
+        sev = SEVERITY_EMOJI.get(iss.severity, "⚪")
+        cve = _extract_cve(iss)
+        first_seen = iss.first_seen[:10] if iss.first_seen else "—"
+        lines.append(
+            f"| **{site}** "
+            f"| **{iss.component}** "
+            f"| {f'[{cve}]({iss.link})' if iss.link else cve} "
+            f"| {iss.detail} *(since {first_seen})* "
+            f"| {sev} **{iss.severity.capitalize()}** "
+            f"| {iss.action} |"
+        )
+    lines += ["", "---", ""]
+    return lines
+
+
+def _section_unchanged(diff: DiffResult) -> list[str]:
+    """Compact list of sites with no changes."""
+    if not diff.unchanged:
+        return []
+
+    names = sorted(diff.unchanged)
+    lines = [
+        f"**Unchanged sites ({len(names)}):**",
+        " · ".join(names),
+        "",
+        "---",
         "",
     ]
+    return lines
 
-    if sev_counts and total_vulns > 0:
-        lines += [
-            "### Vulnerability Severity Breakdown",
-            "",
-            "| Severity | Count |",
-            "|----------|-------|",
-        ]
-        for sev, cnt in sorted(sev_counts.items(), key=lambda x: SEVERITY_ORDER.get(x[0], 99)):
-            if cnt > 0:
-                lines.append(f"| {severity_badge(sev)} | {cnt} |")
-        lines.append("")
 
-    lines += ["---", ""]
+def _section_resolved(diff: DiffResult) -> list[str]:
+    """✅ RESOLVED — Fixed since last run."""
+    if not diff.resolved:
+        return []
 
-    # ── WordPress Core ────────────────────────────────────────────────────
-    lines += ["## 🖥 WordPress Core", ""]
-    core_comps = [c for c in result.components if c.kind == "core"]
-    if core_comps:
-        core = core_comps[0]
-        lines += [
-            f"**Installed Version:** `{core.version}`  ",
-            "",
-        ]
-        if core.vulnerabilities:
-            lines += [
-                f"### ⚠ Core Vulnerabilities ({len(core.vulnerabilities)})",
-                "",
-                _vuln_table(core.vulnerabilities),
-                "",
-            ]
-        else:
-            lines += ["✅ No known vulnerabilities found for this core version.", ""]
-    else:
-        lines += ["Version not detected — vulnerability check skipped.", ""]
-
-    lines += ["---", ""]
-
-    # ── Plugins ───────────────────────────────────────────────────────────
-    plugin_comps = [c for c in result.components if c.kind == "plugin"]
-    lines += [f"## 🔌 Plugins ({len(plugin_comps)} detected)", ""]
-
-    if not plugin_comps:
-        lines += ["No plugins detected.", ""]
-    else:
-        # Sort: vulnerable first, then by name
-        plugin_comps_sorted = sorted(
-            plugin_comps,
-            key=lambda c: (not c.has_vulnerabilities, SEVERITY_ORDER.get(c.highest_severity, 99), c.name),
+    lines = [
+        f"## ✅ {len(diff.resolved)} Resolved (fixed since last run)",
+        "",
+        "| Site | Component | CVE | Issue | Severity | Resolution |",
+        "| :--- | :--- | :--- | :--- | :--- | :--- |",
+    ]
+    for site, iss in diff.resolved:
+        sev = SEVERITY_EMOJI.get(iss.severity, "⚪")
+        cve = _extract_cve(iss)
+        lines.append(
+            f"| **{site}** "
+            f"| ~~{iss.component}~~ "
+            f"| {f'[{cve}]({iss.link})' if iss.link else cve} "
+            f"| ~~{iss.detail}~~ "
+            f"| {sev} {iss.severity.capitalize()} "
+            f"| {iss.action} |"
         )
-        for comp in plugin_comps_sorted:
-            vuln_badge = (
-                f" — {severity_badge(comp.highest_severity)} ({len(comp.vulnerabilities)} vuln)"
-                if comp.has_vulnerabilities else " — ✅ No known vulnerabilities"
-            )
-            lines += [
-                f"### {comp.name}{vuln_badge}",
-                "",
-                f"| Field | Value |",
-                f"|-------|-------|",
-                f"| Slug | `{comp.slug}` |",
-                "",
-            ]
-            if comp.latest_version and comp.latest_version[0] != comp.version:
-                lines += [
-                    f"⚠️ [Outdated] Installed: `{comp.version}`",
-                    "",
-                    f"Lastest Version: `{comp.latest_version[0]}` (avail. since: {comp.latest_version[1]})",
-                    "",
-                ]
-            else:
-                lines += [
-                    f"Installed Version: `{comp.version or 'Unknown'}`",
-                    ""
-                ]
-            if comp.vulnerabilities:
-                lines += [
-                    _vuln_table(comp.vulnerabilities),
-                    "",
-                ]
+    lines += ["", "---", ""]
+    return lines
 
-    lines += ["---", ""]
 
-    # ── Themes ────────────────────────────────────────────────────────────
-    theme_comps = [c for c in result.components if c.kind == "theme"]
-    lines += [f"## 🎨 Themes ({len(theme_comps)} detected)", ""]
+def _section_errored(diff: DiffResult) -> list[str]:
+    """⚠ UNREACHABLE / ERRORS."""
+    if not diff.errored:
+        return []
 
-    if not theme_comps:
-        lines += ["No themes detected.", ""]
-    else:
-        for comp in theme_comps:
-            vuln_badge = (
-                f" — {severity_badge(comp.highest_severity)} ({len(comp.vulnerabilities)} vuln)"
-                if comp.has_vulnerabilities else " — ✅ No known vulnerabilities"
-            )
-            lines += [
-                f"### {comp.name}{vuln_badge}",
-                "",
-                f"| Field | Value |",
-                f"|-------|-------|",
-                f"| Slug | `{comp.slug}` |",
-                "",
-            ]
-            if comp.latest_version and comp.latest_version[0] != comp.version:
-                lines += [
-                    f"⚠️ [Outdated] Installed: `{comp.version}`",
-                    "",
-                    f"Lastest Version: `{comp.latest_version[0]}` (avail. since: {comp.latest_version[1]})",
-                    "",
-                ]
-            else:
-                lines += [
-                    f"Installed Version: `{comp.version or 'Unknown'}`",
-                    ""
-                ]
-            if comp.vulnerabilities:
-                lines += [
-                    _vuln_table(comp.vulnerabilities),
-                    "",
-                ]
+    lines = [
+        f"## ⚠ UNREACHABLE / ERRORS *({len(diff.errored)} sites)*",
+        "",
+        "| Site | Error |",
+        "| :--- | :--- |",
+    ]
+    for site, error_msg in diff.errored:
+        lines.append(f"| **{site}** | {error_msg} |")
+    lines += ["", "---", ""]
+    return lines
 
-    lines += ["---", ""]
 
-    # ── Log Analysis ────────────────────────────────────────────────────
-    lines += ["## 📜 Log Analysis", ""]
-    if result.log_analysis:
-        lines += [
-            f"**Analysis Summary:** {result.log_analysis}",
-            "",
-        ]
-    else:
-        lines += [
-            "No log analysis available.",
-            "",
-        ]
+def _footer() -> list[str]:
+    """Footer with generation notice."""
+    return [
+        f"Generated by wp-audit.",
+        "",
+        "*This is an automated security audit. Do not reply to this email.*",
+    ]
 
-    lines += ["---", ""]
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def generate_report(
+    diff: DiffResult,
+    output_dir: Path,
+    total_sites: int,
+    start_time: float,
+) -> Path:
+    """Generate a single digest Markdown report from a DiffResult.
+
+    Parameters
+    ----------
+    diff : DiffResult
+        The diff output from ``Diff.finalize()``.
+    output_dir : Path
+        Directory to write the report into.
+    total_sites : int
+        Total number of sites in the config.
+    start_time : float
+        ``time.time()`` captured at the start of the run.
+
+    Returns
+    -------
+    Path
+        Path to the written Markdown file.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    filename = output_dir / f"Wordpress_Security_Audit_{datetime.now().strftime('%Y%m%d')}.md"
+
+    lines: list[str] = []
+    lines += _header(total_sites, diff, start_time)
+    lines += _section_new(diff)
+    lines += _section_existing(diff)
+    lines += _section_unchanged(diff)
+    lines += _section_resolved(diff)
+    lines += _section_errored(diff)
+    lines += _footer()
 
     report_text = "\n".join(lines)
     filename.write_text(report_text, encoding="utf-8")
+    log.info("  📄 Digest report saved: %s", filename)
     return filename

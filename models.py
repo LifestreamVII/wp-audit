@@ -17,14 +17,15 @@ class Vulnerability:
     name: str
     description: Optional[str]
     max_version: Optional[str]
-    max_operator: str = "lt"
     min_version: Optional[str]
-    min_operator: str = "ge"
-    unfixed: bool
-    sources: list[dict]
     cvss_score: Optional[float]
     cvss_severity: Optional[str]
+    sources: list[dict]
     cwe: list[str]
+    unfixed: bool
+    max_operator: str = "lt"
+    min_operator: str = "ge"
+    link: Optional[str] = None
 
     @property
     def severity_label(self) -> str:
@@ -57,7 +58,6 @@ class Component:
     @property
     def has_vulnerabilities(self) -> bool:
         return len(self.vulnerabilities) > 0
-
 
 @dataclass
 class SiteAuditResult:

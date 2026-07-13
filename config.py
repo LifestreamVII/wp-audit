@@ -13,6 +13,7 @@ DEFAULT_OUTPUT_DIR = "reports"
 REQUEST_TIMEOUT = 15          # seconds per HTTP request
 CONNECTION_RETRIES = 2        # number of retries for transient errors
 RATE_LIMIT_DELAY = 0.5        # seconds between requests to wpvulnerability.net
+SSH_PORT = 3211  # SSH port for connecting to WordPress hosts
 USER_AGENT = (
     "Mozilla/5.0 (compatible; wp_audit/1.0; +) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
 )
@@ -27,11 +28,17 @@ WP_THEME_API_BASE = (
 )
 
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "none": 4, "unknown": 5}
-LLM_MODEL = "hf.co/michaelw9999/Qwopus3.6-27B-Coder-MTP-NVFP4-GGUF"  # Model for LLMClient
+
+# ---------------------------------------------------------------------------
+# AI Generation
+# ---------------------------------------------------------------------------
+
+LLM_MODEL = "gemma3:4b"  # Model for LLMClient
 LLM_BASE_URL = "http://localhost:11434/v1/"  # Base URL for LLMClient
 LLM_API_KEY = "ollama"
-
-SSH_PORT = 3211  # SSH port for connecting to WordPress hosts
+LLM_PROMPT = (
+    "You are a WordPress security expert. Analyze the following logs and provide a short summary (max 2800 chars. if there are a lot of problematic entries) stating potential security issues in the WordPress site. Stay concise and assume the reader is a security professional. If there is a solution, mention it briefly in one or two sentences. Do not provide any other information or commentary."
+)
 
 # ---------------------------------------------------------------------------
 # Email / SMTP
