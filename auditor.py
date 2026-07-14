@@ -2,6 +2,7 @@
 auditor.py — Core site audit orchestration for wp_audit.
 """
 
+import shlex
 from datetime import datetime as dt, timezone
 from typing import Optional
 from ai import LLMClient
@@ -164,7 +165,8 @@ def audit_site(name: str, host: str, username: str, password: str, port: int, di
     try:
         log.info("  📝 Reconnecting for log collection…")
         client = client_connect(host, username, password, port)
-        result.logs = filter_logs(client, f"{directory}/wp-content/debug.log", inc_notices=True, td=2)
+        debug_log_path = f"{directory.rstrip('/')}/wp-content/debug.log"
+        result.logs = filter_logs(client, debug_log_path, inc_notices=True, td=2)
         
         if result.logs and not skip_logs:
             log.info("  🧠 Analyzing logs with LLM…")

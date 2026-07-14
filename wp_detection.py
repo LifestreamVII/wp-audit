@@ -5,6 +5,7 @@ wp_detection.py — WordPress core/plugin/theme detection helpers via SSH.
 import datetime
 from datetime import datetime as dt, timedelta, timezone
 import re
+import shlex
 from typing import Optional
 
 import paramiko
@@ -26,9 +27,10 @@ def detect_wp_version(client: paramiko.SSHClient, directory: str) -> tuple[Optio
     """
     # Primary: parse $wp_version from version.php
     version_file = f"{directory.rstrip('/')}/wp-includes/version.php"
+    version_file_quoted = shlex.quote(version_file)
     output = run_ssh_command(
         client,
-        f"grep -E \"\\$wp_version\\s*=\" {version_file} 2>/dev/null | head -1",
+        f"grep -E \"\\$wp_version\\s*=\" {version_file_quoted} 2>/dev/null | head -1",
     )
     if output:
         m = re.search(r"\$wp_version\s*=\s*['\"]([^'\"]+)['\"]", output)
@@ -53,7 +55,8 @@ def extract_themes(client: paramiko.SSHClient, directory: str) -> Optional[dict]
     Style.css cannot be read).
     """
     themes_dir = f"{directory.rstrip('/')}/wp-content/themes"
-    output = run_ssh_command(client, f"ls -1 {themes_dir} 2>/dev/null")
+    themes_dir_quoted = shlex.quote(themes_dir)
+    output = run_ssh_command(client, f"ls -1 {themes_dir_quoted} 2>/dev/null")
     if not output:
         return None
     themes: dict[str, str] = {}
@@ -67,9 +70,10 @@ def extract_themes(client: paramiko.SSHClient, directory: str) -> Optional[dict]
             continue  # skip single-file plugins
         # Try to get the Theme Name from style.css
         style_css = f"{themes_dir}/{slug}/style.css"
+        style_css_quoted = shlex.quote(style_css)
         name_output = run_ssh_command(
             client,
-            f"grep -m1 '^Theme Name' {style_css} 2>/dev/null",
+            f"grep -m1 '^Theme Name' {style_css_quoted} 2>/dev/null",
         )
         if name_output:
             m = re.match(r"Theme Name\s*:\s*(.+)", name_output)
@@ -89,9 +93,11 @@ def probe_content_version(client: paramiko.SSHClient, directory: str, kind: str,
 
     # 1. Try readme.txt "Stable tag" line (plugins & themes)
     for readme in ("readme.txt", "README.txt", "README.md"):
+        readme_path = f"{base}/{readme}"
+        readme_path_quoted = shlex.quote(readme_path)
         output = run_ssh_command(
             client,
-            f"grep -im1 'stable tag' {base}/{readme} 2>/dev/null",
+            f"grep -im1 'stable tag' {readme_path_quoted} 2>/dev/null",
         )
         if output:
             m = re.search(r"stable tag\s*:\s*([\d.]+)", output, re.IGNORECASE)
@@ -100,9 +106,11 @@ def probe_content_version(client: paramiko.SSHClient, directory: str, kind: str,
 
     # 2. Try "Version:" header in the main plugin PHP file
     if kind == "plugin":
+        php_pattern = f"{base}/*.php"
+        php_pattern_quoted = shlex.quote(php_pattern)
         main_php = run_ssh_command(
             client,
-            f"grep -rim1 '^[ \t*]*Version:' {base}/*.php 2>/dev/null | head -1",
+            f"grep -rim1 '^[ \t*]*Version:' {php_pattern_quoted} 2>/dev/null | head -1",
         )
         if main_php:
             m = re.search(r"Version:\s*([\d.]+)", main_php, re.IGNORECASE)
@@ -153,7 +161,8 @@ def extract_plugins(client: paramiko.SSHClient, directory: str, mu: bool = False
         plugins_dir = f"{directory.rstrip('/')}/wp-content/mu-plugins"
     else:
         plugins_dir = f"{directory.rstrip('/')}/wp-content/plugins"
-    output = run_ssh_command(client, f"ls -1 {plugins_dir} 2>/dev/null")
+    plugins_dir_quoted = shlex.quote(plugins_dir)
+    output = run_ssh_command(client, f"ls -1 {plugins_dir_quoted} 2>/dev/null")
     if not output:
         return None
     plugins: dict[str, str] = {}
@@ -166,9 +175,11 @@ def extract_plugins(client: paramiko.SSHClient, directory: str, mu: bool = False
         if slug.endswith(".php"):
             continue  # skip single-file plugins
         # Try to get the Plugin Name from the main PHP header
+        php_pattern = f"{plugins_dir}/{slug}/*.php"
+        php_pattern_quoted = shlex.quote(php_pattern)
         name_output = run_ssh_command(
             client,
-            f"grep -rim1 '^[ \t*]*Plugin Name' {plugins_dir}/{slug}/*.php 2>/dev/null | head -1",
+            f"grep -rim1 '^[ \t*]*Plugin Name' {php_pattern_quoted} 2>/dev/null | head -1",
         )
         if name_output:
             m = re.search(r"Plugin Name\s*:\s*(.+)", name_output, re.IGNORECASE)
