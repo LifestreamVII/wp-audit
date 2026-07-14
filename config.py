@@ -14,6 +14,7 @@ REQUEST_TIMEOUT = 15          # seconds per HTTP request
 CONNECTION_RETRIES = 2        # number of retries for transient errors
 RATE_LIMIT_DELAY = 0.5        # seconds between requests to wpvulnerability.net
 SSH_PORT = 3211  # SSH port for connecting to WordPress hosts
+DEBUG_LOG_CAP = 800  # Maximum number of log lines to keep in memory for debug output
 USER_AGENT = (
     "Mozilla/5.0 (compatible; wp_audit/1.0; +) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
 )

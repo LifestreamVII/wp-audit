@@ -156,7 +156,7 @@ def fingerprint(result: SiteAuditResult) -> str:
             for c in result.components
             for v in c.vulnerabilities
         ),
-        "logs": result.logs[-1] if result.logs else None,
+        "logs": result.logs[0] if result.logs else None,
     }, sort_keys=True)
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
@@ -272,7 +272,7 @@ def build_issues(result: SiteAuditResult, now: str) -> dict[str, Issue]:
                 )
 
     # ── Log findings ──────────────────────────────────────────────────
-    log_line = result.logs[-1] or None
+    log_line = result.logs[0] or None
     if log_line is not None:
         iid = gen_issueid("log", log_line=log_line)
         detail = result.log_analysis or "Review log entry"

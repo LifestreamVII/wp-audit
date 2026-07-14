@@ -9,10 +9,11 @@ from typing import Optional
 
 import paramiko
 
-from config import log
+from config import DEBUG_LOG_CAP, log
 from ssh import run_ssh_command
 from http_client import http
 from config import WP_PLUGIN_API_BASE, WP_THEME_API_BASE
+from file import reverse_readline
 
 # ---------------------------------------------------------------------------
 # WordPress detection helpers
@@ -188,8 +189,8 @@ def filter_logs(client: paramiko.SSHClient, path: str, inc_notices: bool = False
     try:
         sftp = client.open_sftp()
 
-        with sftp.open(path, 'r') as log_file:
-            for line in log_file:
+        with sftp.open(path, 'rb') as log_file:
+            for line in reverse_readline(fh=log_file, buf_size=8192, limit=DEBUG_LOG_CAP):
                 # Exclude lines that don't have "Warning" or "Error"
                 if not inc_notices and "Warning" not in line and "Error" not in line:
                     continue
@@ -211,6 +212,7 @@ def filter_logs(client: paramiko.SSHClient, path: str, inc_notices: bool = False
                     if message_content not in seen_messages:
                         seen_messages.add(message_content)
                         extracted_logs.append(line.strip())
+
     except Exception as e:
         log.warning("  ✗ Error reading log file: %s", e)
     finally:

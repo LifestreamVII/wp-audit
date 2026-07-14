@@ -27,7 +27,6 @@ from config import DEFAULT_CONFIG, DEFAULT_OUTPUT_DIR, log
 from email_report import send_digest_email
 from reporter import generate_report
 
-
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
