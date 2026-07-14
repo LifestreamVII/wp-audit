@@ -13,7 +13,7 @@ DEFAULT_OUTPUT_DIR = "reports"
 REQUEST_TIMEOUT = 15          # seconds per HTTP request
 CONNECTION_RETRIES = 2        # number of retries for transient errors
 RATE_LIMIT_DELAY = 0.5        # seconds between requests to wpvulnerability.net
-SSH_PORT = 3211  # SSH port for connecting to WordPress hosts
+SSH_PORT = 22  # SSH port for connecting to WordPress hosts
 DEBUG_LOG_CAP = 800  # Maximum number of log lines to keep in memory for debug output
 USER_AGENT = (
     "Mozilla/5.0 (compatible; wp_audit/1.0; +) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
@@ -52,6 +52,7 @@ SMTP_PASSWORD = ""  # SMTP login password / app-password
 EMAIL_SENDER = ""
 EMAIL_RECIPIENT = ""
 EMAIL_SUBJECT_PREFIX = "[WP-Audit] Security Report"
+MAXIMUM_INLINE_TABLE_ROWS = 20  # Maximum number of rows to include inline in the email report
 
 # ---------------------------------------------------------------------------
 # Logging

@@ -13,15 +13,15 @@ from config import CONNECTION_RETRIES, SSH_PORT, log
 # SSH helpers
 # ---------------------------------------------------------------------------
 
-def client_connect(host: str, user: str, password: str) -> paramiko.SSHClient:
+def client_connect(host: str, user: str, password: str, port: int = SSH_PORT) -> paramiko.SSHClient:
     client = paramiko.SSHClient()
     client.load_system_host_keys()  # Load known_hosts from the system
     client.set_missing_host_key_policy(paramiko.RejectPolicy())  # Deny unknown hosts
-    client.connect(hostname=host, username=user, password=password, timeout=10, port=SSH_PORT)
+    client.connect(hostname=host, username=user, password=password, timeout=10, port=port)
     return client
 
 
-def establish_connection(host: str, user: str, password: str) -> bool:
+def establish_connection(host: str, user: str, password: str, port: int = SSH_PORT) -> bool:
     """
     Attempt to establish an SSH connection to the host using provided credentials.
     Returns True if successful, False otherwise.
@@ -30,7 +30,7 @@ def establish_connection(host: str, user: str, password: str) -> bool:
     retries = 0
     while success is False and retries < CONNECTION_RETRIES:
         try:
-            client = client_connect(host, user, password)
+            client = client_connect(host, user, password, port)
             client.close()
             success = True
             break

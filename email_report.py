@@ -27,6 +27,7 @@ from config import (
     SMTP_PASSWORD,
     SMTP_PORT,
     SMTP_USER,
+    MAXIMUM_INLINE_TABLE_ROWS,
     log,
 )
 from state import DiffResult, Issue
@@ -154,6 +155,8 @@ def _html_issue_table(items: list[tuple[str, Issue]]) -> str:
         f'<div style="font-size:16px;padding:16px 24px 16px 24px">'
         f'<table style="{_TABLE_STYLE}">{rows_html}{tbody}</table>'
         f'</div>'
+        f'<p style="font-size:12px;padding:0px 24px 16px 24px">'
+        f'Showing first {MAXIMUM_INLINE_TABLE_ROWS} items; full report attached as PDF.</p>'
     )
 
 
@@ -184,6 +187,8 @@ def _html_errored_table(items: list[tuple[str, str]]) -> str:
         f'<div style="font-size:16px;padding:16px 24px 16px 24px">'
         f'<table style="{_TABLE_STYLE}">{rows_html}{tbody}</table>'
         f'</div>'
+        f'<p style="font-size:12px;padding:0px 24px 16px 24px">'
+        f'Showing first {MAXIMUM_INLINE_TABLE_ROWS} items; full report attached as PDF.</p>'
     )
 
 
@@ -227,7 +232,7 @@ def _build_summary_body(
 
     # ── 🚨 NEW issues (highlighted background) ───────────────────────────
     if diff.new:
-        sorted_new = sorted(diff.new, key=lambda p: SEVERITY_ORDER.get(p[1].severity, 99))
+        sorted_new = sorted(diff.new[:MAXIMUM_INLINE_TABLE_ROWS], key=lambda p: SEVERITY_ORDER.get(p[1].severity, 99))
         inner = (
             f'<h2 style="font-weight:bold;margin:0;font-size:24px;'
             f'padding:16px 24px 16px 24px">'
@@ -244,7 +249,7 @@ def _build_summary_body(
 
     # ── ⏸ EXISTING (previously reported, not resolved) ────────────────────
     if diff.existing:
-        sorted_existing = sorted(diff.existing, key=lambda p: SEVERITY_ORDER.get(p[1].severity, 99))
+        sorted_existing = sorted(diff.existing[:MAXIMUM_INLINE_TABLE_ROWS], key=lambda p: SEVERITY_ORDER.get(p[1].severity, 99))
         sections.append(
             f'<h2 style="font-weight:bold;margin:0;font-size:24px;'
             f'padding:16px 24px 16px 24px">'
@@ -260,7 +265,7 @@ def _build_summary_body(
             f'padding:16px 24px 16px 24px">'
             f'✅ {len(diff.resolved)} Resolved (fixed since last run)</h2>'
         )
-        sections.append(_html_issue_table(diff.resolved))
+        sections.append(_html_issue_table(diff.resolved[:MAXIMUM_INLINE_TABLE_ROWS]))
         sections.append(_html_divider())
 
     # ── ⚠ UNREACHABLE / ERRORS ───────────────────────────────────────────
@@ -270,7 +275,7 @@ def _build_summary_body(
             f'padding:16px 24px 16px 24px">'
             f'⚠ Unreachable</h2>'
         )
-        sections.append(_html_errored_table(diff.errored))
+        sections.append(_html_errored_table(diff.errored[:MAXIMUM_INLINE_TABLE_ROWS]))
         sections.append(_html_divider())
 
     # ── Other (unchanged sites) ───────────────────────────────────────────

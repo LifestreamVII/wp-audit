@@ -23,7 +23,7 @@ import yaml
 import time
 
 from auditor import audit_site
-from config import DEFAULT_CONFIG, DEFAULT_OUTPUT_DIR, log
+from config import DEFAULT_CONFIG, DEFAULT_OUTPUT_DIR, SSH_PORT, log
 from email_report import send_digest_email
 from reporter import generate_report
 
@@ -104,6 +104,7 @@ Examples:
         host = site.get("host", "")
         username = site.get("username", "")
         password = site.get("password", "")
+        port = site.get("port", SSH_PORT)  # Default to 22 if not specified
         directory = site.get("directory", "/var/www/html")
         url = site.get("url", f"https://{host}")
         if not host:
@@ -111,7 +112,7 @@ Examples:
             continue
 
         try:
-            result = audit_site(name, host, username, password, directory, url, skip_logs=args.no_logs)
+            result = audit_site(name, host, username, password, port, directory, url, skip_logs=args.no_logs)
             if d is not None:
                 d.add(result)
         except Exception as exc:
