@@ -15,7 +15,8 @@ from config import CONNECTION_RETRIES, SSH_PORT, log
 
 def client_connect(host: str, user: str, password: str) -> paramiko.SSHClient:
     client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client.load_system_host_keys()  # Load known_hosts from the system
+    client.set_missing_host_key_policy(paramiko.RejectPolicy())  # Deny unknown hosts
     client.connect(hostname=host, username=user, password=password, timeout=10, port=SSH_PORT)
     return client
 
