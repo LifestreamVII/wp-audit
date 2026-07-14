@@ -364,7 +364,7 @@ def send_digest_email(
     msg = MIMEMultipart()
     msg["From"] = EMAIL_SENDER
     msg["To"] = EMAIL_RECIPIENT
-    msg["Subject"] = f"{EMAIL_SUBJECT_PREFIX} {analysis_dt.strftime('%d-%m-%Y')}"
+    msg["Subject"] = f"{EMAIL_SUBJECT_PREFIX} {analysis_dt.strftime('%d-%m-%Y')} ({len(diff.new)} new issues, {len(diff.existing)} existing)"
     msg.attach(MIMEText(body, "html"))
 
     # ── Convert reports to PDF & attach ───────────────────────────────────
