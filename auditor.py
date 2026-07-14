@@ -59,10 +59,18 @@ def audit_site(name: str, host: str, username: str, password: str, directory: st
         plugin_map = extract_plugins(client, directory) or {}
         log.info("  ✓ %d plugin(s) found", len(plugin_map))
 
+        log.info("  🔎 Discovering mu-plugins…")
+        mu_plugin_map = extract_plugins(client, directory, mu=True) or {}
+
         # ── 4. Plugin version probing ─────────────────────────────────────────
         plugin_versions: dict[str, Optional[str]] = {}
         plugin_versions_latest: dict[str, Optional[tuple[str, str]]] = {}
         for slug in plugin_map:
+            plugin_versions[slug] = probe_content_version(client, directory, "plugin", slug)
+            plugin_versions_latest[slug] = get_content_latest_version(slug, "plugin")
+        for slug in mu_plugin_map:
+            if slug in plugin_map:
+                continue  # skip if already processed in regular plugins
             plugin_versions[slug] = probe_content_version(client, directory, "plugin", slug)
             plugin_versions_latest[slug] = get_content_latest_version(slug, "plugin")
 

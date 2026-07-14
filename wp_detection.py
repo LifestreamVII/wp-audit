@@ -144,12 +144,15 @@ def get_content_latest_version(slug: str, kind: str) -> Optional[tuple[str, str]
 
     return version, last_updated
 
-def extract_plugins(client: paramiko.SSHClient, directory: str) -> Optional[dict]:
+def extract_plugins(client: paramiko.SSHClient, directory: str, mu: bool = False) -> Optional[dict]:
     """List installed plugins from wp-content/plugins/ via SSH.
 
     Returns a dict mapping slug -> display name.
     """
-    plugins_dir = f"{directory.rstrip('/')}/wp-content/plugins"
+    if mu:
+        plugins_dir = f"{directory.rstrip('/')}/wp-content/mu-plugins"
+    else:
+        plugins_dir = f"{directory.rstrip('/')}/wp-content/plugins"
     output = run_ssh_command(client, f"ls -1 {plugins_dir} 2>/dev/null")
     if not output:
         return None
