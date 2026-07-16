@@ -92,6 +92,7 @@ def audit_site(name: str, host: str, username: str, password: str, port: int, di
 
     # ── 6. Build component list ────────────────────────────────────────────
     components: list[Component] = []
+    components_errors = {}
 
     # WP Core
     if wp_version:
@@ -113,6 +114,8 @@ def audit_site(name: str, host: str, username: str, password: str, port: int, di
             version_source="readme.txt" if plugin_versions.get(slug) else "not-detected",
             latest_version=plugin_versions_latest.get(slug),
         ))
+        if plugin_versions_latest.get(slug) is None:
+            components_errors[slug] = f"Could not fetch latest version for {slug}."
 
     # Themes
     for slug, display_name in theme_map.items():
@@ -124,6 +127,8 @@ def audit_site(name: str, host: str, username: str, password: str, port: int, di
             version_source="style.css" if theme_versions.get(slug) else "not-detected",
             latest_version=theme_versions_latest.get(slug),
         ))
+        if theme_versions_latest.get(slug) is None:
+            components_errors[slug] = f"Could not fetch latest version for {slug}."
 
     # ── 7. Vulnerability lookups ───────────────────────────────────────────
     log.info("  🔍 Looking up vulnerabilities for %d component(s)…", len(components))
@@ -138,7 +143,7 @@ def audit_site(name: str, host: str, username: str, password: str, port: int, di
             all_vulns = []
 
         if all_vulns is None:
-            result.error = f"Could not fetch vulnerabilities for {comp.kind}/{comp.slug}"
+            components_errors[comp.slug] = f"Could not fetch vulnerabilities for {comp.kind}/{comp.slug}"
         else:
             comp.vulnerabilities = filter_vulns_for_version(all_vulns, comp.version)
             if comp.version:
@@ -152,8 +157,11 @@ def audit_site(name: str, host: str, username: str, password: str, port: int, di
                 "  ⚠  %s (%s): %d vulnerability/ies found",
                 comp.name, comp.version or "?", len(comp.vulnerabilities),
             )
-
+    if len(list(components_errors.keys())) == len(components):
+        result.error = "Could not fetch vulnerabilities for any components"
+        log.error("  ✗ %s", result.error)
     result.components = components
+    result.components_errors = components_errors
     log.info(
         "  ✓ Done — %d component(s), %d vulnerable, %d total vulns",
         len(components),

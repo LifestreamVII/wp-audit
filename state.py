@@ -156,6 +156,7 @@ def fingerprint(result: SiteAuditResult) -> str:
             for c in result.components
             for v in c.vulnerabilities
         ),
+        "comp_errors": sorted(result.components_errors),
         "logs": result.logs[0] if result.logs else None,
     }, sort_keys=True)
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
@@ -203,6 +204,11 @@ def gen_issueid(
         if log_line is None:
             raise ValueError("gen_issueid('log') requires log_line")
         return f"log|{_short_hash(log_line)}"
+    
+    elif finding_type == "fail":
+        if component is None:
+            raise ValueError("gen_issueid('fail') requires component")
+        return f"fail|{component.kind}|{component.slug}"
 
     elif finding_type == "unreachable":
         if site_name is None:
@@ -257,11 +263,23 @@ def build_issues(result: SiteAuditResult, now: str) -> dict[str, Issue]:
                 link=vuln.link,
             )
 
+        # ── Could not fetch vulnerabilities/version ─────────────────────────────
+        if comp.slug in result.components_errors:
+            iid = gen_issueid("fail", component=comp)
+            issues[iid] = Issue(
+                id=iid,
+                severity="unknown",
+                component=comp.name,
+                detail=result.components_errors[comp.slug],
+                action="Investigate audit script or server connectivity",
+                first_seen=now,
+            )
+
         # ── Outdated (no vuln, but behind on version) ─────────────────
         if comp.latest_version and not comp.vulnerabilities:
             latest_ver, _ = comp.latest_version
             if comp.version and comp.version != latest_ver:
-                iid = gen_issueid("outdated", component=comp)
+                iid = gen_issueid("fail", component=comp)
                 issues[iid] = Issue(
                     id=iid,
                     severity="low",
@@ -272,18 +290,19 @@ def build_issues(result: SiteAuditResult, now: str) -> dict[str, Issue]:
                 )
 
     # ── Log findings ──────────────────────────────────────────────────
-    log_line = result.logs[0] or None
-    if log_line is not None:
-        iid = gen_issueid("log", log_line=log_line)
-        detail = result.log_analysis or "Review log entry"
-        issues[iid] = Issue(
-            id=iid,
-            severity="unknown",
-            component="debug.log",
-            detail=detail,
-            action="Review log entry",
-            first_seen=now,
-        )
+    if result.logs and len(result.logs) > 0:
+        log_line = result.logs[0] or None
+        if log_line is not None:
+            iid = gen_issueid("log", log_line=log_line)
+            detail = result.log_analysis or "Review log entry"
+            issues[iid] = Issue(
+                id=iid,
+                severity="unknown",
+                component="debug.log",
+                detail=detail,
+                action="Review log entry",
+                first_seen=now,
+            )
 
     return issues
 
@@ -339,7 +358,7 @@ class Diff:
             self._add_unchanged(site, old_snap)
         else:
             self._add_changed(site, result, old_snap)
-
+        
     # -- Internal handlers (one per classification) ------------------------
 
     def _add_errored(
@@ -357,7 +376,7 @@ class Diff:
         self._new_sites[site] = SiteSnapshot(
             fingerprint="",
             last_checked=self._now,
-            issues=current,
+            issues={iid: iss for iid, iss in current.items() if not iid.startswith("fail|")},
         )
 
     def _add_unchanged(self, site: str, old_snap: SiteSnapshot) -> None:
@@ -395,7 +414,7 @@ class Diff:
         self._new_sites[site] = SiteSnapshot(
             fingerprint=fp,
             last_checked=self._now,
-            issues=current,
+            issues={iid: iss for iid, iss in current.items() if not iid.startswith("fail|")},
         )
 
     # -- Finalize ----------------------------------------------------------

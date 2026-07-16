@@ -92,7 +92,6 @@ def _section_new(diff: DiffResult) -> list[str]:
         return []
 
     items = sorted(diff.new, key=_severity_sort_key)
-
     lines = [
         f"## 🚨 NEW — {len(items)} New issues detected",
         "",
@@ -124,7 +123,6 @@ def _section_existing(diff: DiffResult) -> list[str]:
         return []
 
     items = sorted(diff.existing, key=_severity_sort_key)
-
     lines = [
         f"## ⏸ {len(items)} Previous issues (not resolved)",
         "",

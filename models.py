@@ -71,6 +71,7 @@ class SiteAuditResult:
     log_analysis: Optional[str]
     wp_version_source: str
     components: list[Component] = field(default_factory=list)
+    components_errors: dict[str, str] = field(default_factory=dict)
 
     @property
     def vulnerable_components(self) -> list[Component]:
