@@ -27,6 +27,7 @@ WP_THEME_API_BASE = (
     # e.g. : ?action=theme_information&slug=astra
     "https://api.wordpress.org/themes/info/1.2/"
 )
+DISABLE_WP_CLI = False # Enforce skipping WP-CLI commands and rely on file inspection only
 
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "none": 4, "unknown": 5}
 

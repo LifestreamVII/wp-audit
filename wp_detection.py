@@ -10,8 +10,8 @@ from typing import Optional
 
 import paramiko
 
-from config import DEBUG_LOG_CAP, log
-from ssh import run_ssh_command
+from config import DEBUG_LOG_CAP, DISABLE_WP_CLI, log
+from ssh import run_ssh_command, has_wp_cli
 from http_client import http
 from config import WP_PLUGIN_API_BASE, WP_THEME_API_BASE
 from file import reverse_readline
@@ -25,7 +25,13 @@ def detect_wp_version(client: paramiko.SSHClient, directory: str) -> tuple[Optio
     Detect the WordPress core version from wp-includes/version.php via SSH.
     Returns a (version_string, source_label) tuple.
     """
-    # Primary: parse $wp_version from version.php
+    # Use WP-CLI to get the version if available
+    if has_wp_cli(client) and not DISABLE_WP_CLI:
+        output = run_ssh_command(client, f"cd {shlex.quote(directory)} && wp core version 2>/dev/null")
+        if output and re.match(r"^[\d.]+$", output.strip()):
+            return output.strip(), "wp-cli"
+
+    # Primary file-based: parse $wp_version from version.php
     version_file = f"{directory.rstrip('/')}/wp-includes/version.php"
     version_file_quoted = shlex.quote(version_file)
     output = run_ssh_command(
@@ -54,6 +60,16 @@ def extract_themes(client: paramiko.SSHClient, directory: str) -> Optional[dict]
     Returns a dict mapping slug -> display name (slug is used as name when
     Style.css cannot be read).
     """
+    if has_wp_cli(client) and not DISABLE_WP_CLI:
+        output = run_ssh_command(client, f"cd {shlex.quote(directory)} && wp theme list --field=name --format=csv 2>/dev/null")
+        if output:
+            themes = {}
+            for line in output.splitlines():
+                slug = line.strip()
+                if slug:
+                    themes[slug] = slug
+            return themes or None
+
     themes_dir = f"{directory.rstrip('/')}/wp-content/themes"
     themes_dir_quoted = shlex.quote(themes_dir)
     output = run_ssh_command(client, f"ls -1 {themes_dir_quoted} 2>/dev/null")
@@ -89,6 +105,17 @@ def probe_content_version(client: paramiko.SSHClient, directory: str, kind: str,
     Probe the readme.txt (or the main plugin PHP file header) of a plugin or
     theme to extract its version string via SSH.
     """
+    if has_wp_cli(client) and not DISABLE_WP_CLI:
+        if kind == "plugin":
+            output = run_ssh_command(client, f"cd {shlex.quote(directory)} && wp plugin get {shlex.quote(slug)} --field=version 2>/dev/null")
+        elif kind == "theme":
+            output = run_ssh_command(client, f"cd {shlex.quote(directory)} && wp theme get {shlex.quote(slug)} --field=version 2>/dev/null")
+        else:
+            log.warning("Unknown content kind: %s", kind)
+            return None
+        if output and re.match(r"^[\d.]+$", output.strip()):
+            return output.strip()
+
     base = f"{directory.rstrip('/')}/wp-content/{kind}s/{slug}"
 
     # 1. Try readme.txt "Stable tag" line (plugins & themes)
@@ -157,6 +184,19 @@ def extract_plugins(client: paramiko.SSHClient, directory: str, mu: bool = False
 
     Returns a dict mapping slug -> display name.
     """
+    if has_wp_cli(client) and not DISABLE_WP_CLI:
+        if mu:
+            output = run_ssh_command(client, f"cd {shlex.quote(directory)} && wp plugin list --status=must-use --field=name --format=csv 2>/dev/null")
+        else:
+            output = run_ssh_command(client, f"cd {shlex.quote(directory)} && wp plugin list --field=name --format=csv 2>/dev/null")
+        if output:
+            plugins = {}
+            for line in output.splitlines():
+                slug = line.strip()
+                if slug:
+                    plugins[slug] = slug
+            return plugins or None
+
     if mu:
         plugins_dir = f"{directory.rstrip('/')}/wp-content/mu-plugins"
     else:

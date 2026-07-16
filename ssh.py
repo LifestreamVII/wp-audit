@@ -61,3 +61,11 @@ def run_ssh_command(client: paramiko.SSHClient, command: str) -> Optional[str]:
     except Exception as e:
         log.warning("Failed to execute SSH command '%s': %s", command, e)
         return None
+
+def has_wp_cli(client: paramiko.SSHClient) -> bool:
+    """
+    Check if WP-CLI is available on the remote server.
+    Returns True if wp command is found, False otherwise.
+    """
+    output = run_ssh_command(client, "which wp")
+    return bool(output)
