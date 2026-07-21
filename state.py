@@ -279,7 +279,7 @@ def build_issues(result: SiteAuditResult, now: str) -> dict[str, Issue]:
         if comp.latest_version and not comp.vulnerabilities:
             latest_ver, _ = comp.latest_version
             if comp.version and comp.version != latest_ver:
-                iid = gen_issueid("fail", component=comp)
+                iid = gen_issueid("outdated", component=comp)
                 issues[iid] = Issue(
                     id=iid,
                     severity="low",
