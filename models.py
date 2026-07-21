@@ -48,7 +48,7 @@ class Component:
     def highest_severity(self) -> str:
         if not self.vulnerabilities:
             return "none"
-        min_v = 4
+        min_v = 5
         for v in self.vulnerabilities:
             sev = SEVERITY_ORDER.get(v.severity_label, 99)
             if sev < min_v:

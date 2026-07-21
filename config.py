@@ -29,7 +29,7 @@ WP_THEME_API_BASE = (
 )
 DISABLE_WP_CLI = False # Enforce skipping WP-CLI commands and rely on file inspection only
 
-SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "none": 4, "unknown": 5}
+SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "unknown": 4, "none": 5}
 
 # ---------------------------------------------------------------------------
 # AI Generation
