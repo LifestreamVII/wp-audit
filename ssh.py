@@ -56,7 +56,6 @@ def run_ssh_command(client: paramiko.SSHClient, command: str) -> Optional[str]:
         error = stderr.read().decode("utf-8").strip()
         if error:
             log.warning("SSH command error: %s", error)
-            return None
         return output if output else None
     except Exception as e:
         log.warning("Failed to execute SSH command '%s': %s", command, e)
