@@ -39,7 +39,8 @@ sites:
   - name: "WordPress Blog"
     host: "localhost"
     username: "root"
-    password: "root"
+    password: "root" # password or key passphrase
+    key: "/path/to/private/key"  # optional, if using key-based auth
     url: "https://localhost"
     directory: "/var/www/html"
 ```
@@ -49,6 +50,7 @@ Fields used per site:
 - `host`: SSH hostname/IP
 - `username`: SSH username
 - `password`: SSH password
+- `key`: path to private key file (if using key-based authentication)
 - `url`: public site URL (only used for report metadata)
 - `directory`: WordPress root directory on remote host
 

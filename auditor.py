@@ -17,7 +17,7 @@ from wp_detection import detect_wp_version, extract_plugins, extract_themes, pro
 # Site auditor
 # ---------------------------------------------------------------------------
 
-def audit_site(name: str, host: str, username: str, password: str, port: int, directory: str, url: str, skip_logs: bool = False) -> SiteAuditResult:
+def audit_site(name: str, host: str, username: str, password: str | None, port: int, key: str | None, directory: str, url: str, skip_logs: bool = False) -> SiteAuditResult:
     now = dt.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     log.info("━━━━ Auditing: %s (%s)", name, host)
 
@@ -35,14 +35,14 @@ def audit_site(name: str, host: str, username: str, password: str, port: int, di
 
     # ── 1. Establish SSH connection ──────────────────────────────────────────
     log.info("  🔌 Connecting to %s@%s …", username, host)
-    connected = establish_connection(host, username, password, port)
+    connected = establish_connection(host, username, password, port, key)
     if not connected:
         result.error = f"Could not establish SSH connection to {username}@{host}"
         log.error("  ✗ %s", result.error)
         return result
 
     result.reachable = True
-    client = client_connect(host, username, password, port)
+    client = client_connect(host, username, password, port, key)
 
     try:
         # ── 2. Detect WP version ─────────────────────────────────────────────
@@ -172,7 +172,7 @@ def audit_site(name: str, host: str, username: str, password: str, port: int, di
     # ── 8. Logs Collection & Analysis (LLM) ───────────────────────────────
     try:
         log.info("  📝 Reconnecting for log collection…")
-        client = client_connect(host, username, password, port)
+        client = client_connect(host, username, password, port, key)
         debug_log_path = f"{directory.rstrip('/')}/wp-content/debug.log"
         result.logs = filter_logs(client, debug_log_path, inc_notices=True, td=2)
         

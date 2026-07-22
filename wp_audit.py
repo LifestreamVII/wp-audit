@@ -103,7 +103,8 @@ Examples:
         name = site.get("name", site.get("host", "Unknown"))
         host = site.get("host", "")
         username = site.get("username", "")
-        password = site.get("password", "")
+        password = site.get("password", None)
+        key = site.get("key", None)
         port = site.get("port", SSH_PORT)  # Default to 22 if not specified
         directory = site.get("directory", "/var/www/html")
         url = site.get("url", f"https://{host}")
@@ -112,7 +113,7 @@ Examples:
             continue
 
         try:
-            result = audit_site(name, host, username, password, port, directory, url, skip_logs=args.no_logs)
+            result = audit_site(name, host, username, password, port, key, directory, url, skip_logs=args.no_logs)
             if d is not None:
                 d.add(result)
         except Exception as exc:
