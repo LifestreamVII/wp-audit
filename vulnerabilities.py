@@ -63,6 +63,10 @@ def _parse_version(v: str) -> tuple:
 
 def _operator_match(installed: tuple, constraint: tuple, operator: str) -> bool:
     """Return True if *installed* satisfies ``installed <operator> constraint``."""
+    if len(installed) < len(constraint):
+        installed = installed[:-1] + (0,) * (len(constraint) - len(installed)) + installed[-1:]
+    elif len(constraint) < len(installed):
+        constraint = constraint[:-1] + (0,) * (len(installed) - len(constraint)) + constraint[-1:]
     if operator == "lt":
         return installed < constraint
     elif operator == "le":
