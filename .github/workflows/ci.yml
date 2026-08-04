@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unit:
+    name: unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: Run unit tests
+        run: pytest -m "not e2e" -q
+
+  audit-e2e:
+    name: e2e audit (dockerized vulnerable WordPress)
+    runs-on: ubuntu-latest
+    needs: unit
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the CI harness
+        # Reuses the exact local runner, so local == CI.
+        run: bash scripts/run_ci_locally.sh --e2e-only
+      - name: Upload audit artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-e2e-artifacts
+          path: |
+            ci/run/scenario.json
+            ci/run/scenario.env
+            ci/run/reports/
+            ci/run/reports/state.json
