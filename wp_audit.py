@@ -24,7 +24,6 @@ import time
 
 from auditor import audit_site
 from config import DEFAULT_CONFIG, DEFAULT_OUTPUT_DIR, SSH_PORT, log
-from email_report import send_digest_email
 from reporter import generate_report
 
 # ---------------------------------------------------------------------------
@@ -162,6 +161,9 @@ Examples:
 
     # ── Summary email ─────────────────────────────────────────────────────
     if not args.no_email and report_path is not None:
+        # Imported lazily: the email/PDF stack (weasyprint) is only needed when
+        # a digest email is actually sent, so audit-only runs don't require it.
+        from email_report import send_digest_email
         send_digest_email(
             diff=dr,
             total_sites=len(sites),
