@@ -13,7 +13,7 @@ from config import CONNECTION_RETRIES, SSH_PORT, log
 # SSH helpers
 # ---------------------------------------------------------------------------
 
-def client_connect(host: str, user: str, password: str | None, port: int = SSH_PORT, key_filename: str | None) -> paramiko.SSHClient:
+def client_connect(host: str, user: str, password: str | None, port: int = SSH_PORT, key_filename: str | None = None) -> paramiko.SSHClient:
     client = paramiko.SSHClient()
     client.load_system_host_keys()  # Load known_hosts from the system
     client.set_missing_host_key_policy(paramiko.RejectPolicy())  # Deny unknown hosts
@@ -21,7 +21,7 @@ def client_connect(host: str, user: str, password: str | None, port: int = SSH_P
     return client
 
 
-def establish_connection(host: str, user: str, password: str | None, port: int = SSH_PORT, key_filename: str | None) -> bool:
+def establish_connection(host: str, user: str, password: str | None, port: int = SSH_PORT, key_filename: str | None = None) -> bool:
     """
     Attempt to establish an SSH connection to the host using provided credentials.
     Password or private key authentication can be used. 
