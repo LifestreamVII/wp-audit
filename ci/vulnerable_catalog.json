@@ -1,0 +1,46 @@
+{
+  "_meta": {
+    "verified": "2026-08-04",
+    "note": "Pinned versions correspond to ranges returned live by wpvulnerability.net. 'vulnerable' pins target a version inside a recorded vuln range; 'outdated' pins target a patched-but-not-latest version (to exercise the 'outdated version' issue type). If the upstream API changes and a pin stops producing the expected result, the e2e test fails loudly on that component."
+  },
+  "cores": {
+    "6.4.2": {
+      "expect": "vulnerable",
+      "note": "EOL core with recorded CVEs on wpvulnerability.net"
+    }
+  },
+  "plugins": {
+    "wp-file-manager": {
+      "name": "File Manager",
+      "vulnerable": ["6.8"],
+      "outdated": ["7.1"],
+      "note": "< 7.1 (CVE-2021-24177); also < 6.9 (CVE-2020-25213 RCE)"
+    },
+    "contact-form-7": {
+      "name": "Contact Form 7",
+      "vulnerable": ["5.3.1"],
+      "outdated": ["5.8.6"],
+      "note": "< 5.3.2 (CVE-2020-35489 unrestricted file upload)"
+    },
+    "jetpack": {
+      "name": "Jetpack",
+      "vulnerable": ["9.7.1"],
+      "outdated": ["10.9"],
+      "note": "< 9.8"
+    }
+  },
+  "themes": {
+    "hello-elementor": {
+      "name": "Hello Elementor",
+      "vulnerable": ["2.6.0"],
+      "outdated": ["3.0.1"],
+      "note": "< 3.0.1"
+    },
+    "astra": {
+      "name": "Astra",
+      "vulnerable": ["4.6.8"],
+      "outdated": ["4.12.4"],
+      "note": "< 4.6.5, < 4.6.9, < 4.12.4"
+    }
+  }
+}
