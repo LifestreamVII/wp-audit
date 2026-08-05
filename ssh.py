@@ -13,15 +13,18 @@ from config import CONNECTION_RETRIES, SSH_PORT, log
 # SSH helpers
 # ---------------------------------------------------------------------------
 
-def client_connect(host: str, user: str, password: str | None, port: int = SSH_PORT, key_filename: str | None = None) -> paramiko.SSHClient:
+def client_connect(host: str, user: str, password: str | None, port: int = SSH_PORT, key_filename: str | None = None, bypass_known_hosts: bool = False) -> paramiko.SSHClient:
     client = paramiko.SSHClient()
     client.load_system_host_keys()  # Load known_hosts from the system
-    client.set_missing_host_key_policy(paramiko.RejectPolicy())  # Deny unknown hosts
+    if not bypass_known_hosts:
+        client.set_missing_host_key_policy(paramiko.RejectPolicy())  # Deny unknown hosts
+    else:
+        client.set_missing_host_key_policy(paramiko.WarningPolicy())
     client.connect(hostname=host, username=user, password=password, timeout=10, port=port, key_filename=key_filename)
     return client
 
 
-def establish_connection(host: str, user: str, password: str | None, port: int = SSH_PORT, key_filename: str | None = None) -> bool:
+def establish_connection(host: str, user: str, password: str | None, port: int = SSH_PORT, key_filename: str | None = None, bypass_known_hosts: bool = False) -> bool:
     """
     Attempt to establish an SSH connection to the host using provided credentials.
     Password or private key authentication can be used. 
@@ -32,7 +35,7 @@ def establish_connection(host: str, user: str, password: str | None, port: int =
     retries = 0
     while success is False and retries < CONNECTION_RETRIES:
         try:
-            client = client_connect(host, user, password, port, key_filename)
+            client = client_connect(host, user, password, port, key_filename, bypass_known_hosts)
             client.close()
             success = True
             break
