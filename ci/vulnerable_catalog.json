@@ -10,12 +10,6 @@
     }
   },
   "plugins": {
-    "wp-file-manager": {
-      "name": "File Manager",
-      "vulnerable": ["6.8"],
-      "outdated": ["7.1"],
-      "note": "< 7.1 (CVE-2021-24177); also < 6.9 (CVE-2020-25213 RCE)"
-    },
     "contact-form-7": {
       "name": "Contact Form 7",
       "vulnerable": ["5.3.1"],

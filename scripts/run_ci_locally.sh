@@ -116,25 +116,12 @@ if [ "$UNIT_ONLY" -ne 1 ]; then
     fi
     echo "[ci] fixture SSH is up."
 
-    # Seed ~/.ssh/known_hosts with a NON-PORTED entry. paramiko's
-    # RejectPolicy + HostKeys.lookup() ignores "[host]:port" entries, so a
-    # ported key would be treated as "unknown host" and rejected.
-    mkdir -p "$HOME/.ssh"
-    chmod 700 "$HOME/.ssh"
-    KEY="$(ssh-keyscan -p "$E2E_PORT" 127.0.0.1 2>/dev/null | sed -E 's/^\[[^]]*\]:[0-9]+/127.0.0.1/')"
-    if [ -n "$KEY" ]; then
-        touch "$HOME/.ssh/known_hosts"
-        grep -qF "$KEY" "$HOME/.ssh/known_hosts" 2>/dev/null || echo "$KEY" >> "$HOME/.ssh/known_hosts"
-    else
-        echo "[ci] WARNING: could not read fixture host key (known_hosts not seeded)." >&2
-    fi
-
     # run the real audit CLI against both the fixture and an unreachable host
     echo "[ci] running wp_audit.py …"
     $PY "$ROOT/wp_audit.py" \
         --config "$RUN_DIR/sites.generated.yaml" \
         --output-dir "$RUN_DIR/reports" \
-        --no-email --no-logs
+        --no-email --no-logs --bypass-known-hosts
 
     # assert the expected finding types against the produced state/report
     echo "[ci] running e2e assertions…"
