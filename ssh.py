@@ -13,26 +13,57 @@ from config import CONNECTION_RETRIES, SSH_PORT, log
 # SSH helpers
 # ---------------------------------------------------------------------------
 
-def client_connect(host: str, user: str, password: str | None, port: int = SSH_PORT, key_filename: str | None = None) -> paramiko.SSHClient:
+def client_connect(
+    host: str,
+    user: str,
+    password: str | None,
+    port: int = SSH_PORT,
+    key_filename: str | None = None,
+    known_hosts_file: str | None = None,
+) -> paramiko.SSHClient:
+    """
+    Open an authenticated SSH connection to *host*.
+
+    Host-key verification always uses RejectPolicy (hard deny).  Pass
+    *known_hosts_file* to load an additional known_hosts file on top of the
+    system one — this is how CI supplies the ephemeral container's key without
+    disabling verification for every other host in the run.
+    """
     client = paramiko.SSHClient()
-    client.load_system_host_keys()  # Load known_hosts from the system
-    client.set_missing_host_key_policy(paramiko.RejectPolicy())  # Deny unknown hosts
-    client.connect(hostname=host, username=user, password=password, timeout=10, port=port, key_filename=key_filename)
+    client.load_system_host_keys()          # ~/.ssh/known_hosts (and /etc/ssh/…)
+    if known_hosts_file:
+        client.load_host_keys(known_hosts_file)  # extra file, e.g. ci/run/known_hosts
+    client.set_missing_host_key_policy(paramiko.RejectPolicy())  # deny unknown hosts
+    client.connect(
+        hostname=host,
+        username=user,
+        password=password,
+        timeout=10,
+        port=port,
+        key_filename=key_filename,
+    )
     return client
 
 
-def establish_connection(host: str, user: str, password: str | None, port: int = SSH_PORT, key_filename: str | None = None) -> bool:
+def establish_connection(
+    host: str,
+    user: str,
+    password: str | None,
+    port: int = SSH_PORT,
+    key_filename: str | None = None,
+    known_hosts_file: str | None = None,
+) -> bool:
     """
     Attempt to establish an SSH connection to the host using provided credentials.
-    Password or private key authentication can be used. 
+    Password or private key authentication can be used.
     When both are provided, password is interpreted as the passphrase for the private key.
     Returns True if successful, False otherwise.
     """
     success = False
     retries = 0
-    while success is False and retries < CONNECTION_RETRIES:
+    while not success and retries < CONNECTION_RETRIES:
         try:
-            client = client_connect(host, user, password, port, key_filename)
+            client = client_connect(host, user, password, port, key_filename, known_hosts_file)
             client.close()
             success = True
             break
@@ -42,7 +73,6 @@ def establish_connection(host: str, user: str, password: str | None, port: int =
             log.warning("SSH error for %s@%s: %s", user, host, e)
         except Exception as e:
             log.warning("Connection error for %s@%s: %s", user, host, e)
-        success = False
         retries += 1
     return success
 
