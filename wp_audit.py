@@ -64,8 +64,14 @@ Examples:
         help="Allow SMTP without verified context",
     )
     parser.add_argument(
-        "--bypass-known-hosts", action="store_true",
-        help="Bypass known SSH hosts",
+        "--known-hosts-file",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Path to an additional known_hosts file to load alongside the system one. "
+            "Use this in CI to supply an ephemeral container's host key while keeping "
+            "RejectPolicy active for all other hosts."
+        ),
     )
     parser.add_argument(
         "--output-dir", default=DEFAULT_OUTPUT_DIR,
@@ -116,7 +122,7 @@ Examples:
             continue
 
         try:
-            result = audit_site(name, host, username, password, port, key, directory, url, skip_logs=args.no_logs, bypass_known_hosts=args.bypass_known_hosts)
+            result = audit_site(name, host, username, password, port, key, directory, url, skip_logs=args.no_logs, known_hosts_file=args.known_hosts_file)
             if d is not None:
                 d.add(result)
         except Exception as exc:

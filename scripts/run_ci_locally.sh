@@ -75,6 +75,10 @@ cleanup() {
         echo "[ci] tearing down fixture containers…"
         docker compose -f "$ROOT/ci/docker-compose.yml" -p wp-audit-ci down -v --remove-orphans >/dev/null 2>&1 || true
     fi
+    # Remove the ephemeral known_hosts entry regardless of --keep-up: it is
+    # only valid for this container run, and it should never accumulate in the
+    # developer's workspace between runs.
+    rm -f "$RUN_DIR/known_hosts"
 }
 trap cleanup EXIT
 
@@ -116,12 +120,21 @@ if [ "$UNIT_ONLY" -ne 1 ]; then
     fi
     echo "[ci] fixture SSH is up."
 
+    # Populate a temporary known_hosts file with the fixture's actual host key.
+    # This lets the audit client keep RejectPolicy (hard deny) while still
+    # accepting the ephemeral container — without touching ~/.ssh/known_hosts.
+    # The file lives under ci/run/ (gitignored) and is deleted by cleanup().
+    echo "[ci] writing known_hosts for fixture…"
+    mkdir -p "$RUN_DIR"
+    ssh-keyscan -p "$E2E_PORT" 127.0.0.1 2>/dev/null > "$RUN_DIR/known_hosts"
+
     # run the real audit CLI against both the fixture and an unreachable host
     echo "[ci] running wp_audit.py …"
     $PY "$ROOT/wp_audit.py" \
         --config "$RUN_DIR/sites.generated.yaml" \
         --output-dir "$RUN_DIR/reports" \
-        --no-email --no-logs --bypass-known-hosts
+        --known-hosts-file "$RUN_DIR/known_hosts" \
+        --no-email --no-logs
 
     # assert the expected finding types against the produced state/report
     echo "[ci] running e2e assertions…"
