@@ -28,14 +28,16 @@ KEEP_UP=0
 SEED=""
 EXTRA_PYTEST=()
 
-for arg in "$@"; do
-    case "$arg" in
+while [[ $# -gt 0 ]]; do
+    case "$1" in
         --unit-only) UNIT_ONLY=1 ;;
         --e2e-only)  E2E_ONLY=1 ;;
         --keep-up)   KEEP_UP=1 ;;
-        --seed=*)    SEED="${arg#*=}" ;;
-        *)           EXTRA_PYTEST+=("$arg") ;;
+        --seed=*)    SEED="${1#*=}" ;;
+        --seed)      SEED="$2"; shift ;;
+        *)           EXTRA_PYTEST+=("$1") ;;
     esac
+    shift
 done
 
 # ---------------------------------------------------------------------------
