@@ -38,9 +38,9 @@ def load_catalog() -> dict:
     return data
 
 
-def pick_version(entries: list[str]) -> str:
+def pick_version(entries: list[str], rng: random.Random) -> str:
     """A scenario picks one concrete version per expected outcome."""
-    return random.choice(entries)
+    return rng.choice(entries)
 
 
 def main() -> None:
@@ -77,12 +77,12 @@ def main() -> None:
     ot = rng.choice(out_themes)
 
     plugins = [
-        (vp, pick_version(catalog["plugins"][vp]["vulnerable"]), "vulnerable"),
-        (op, pick_version(catalog["plugins"][op]["outdated"]), "outdated"),
+        (vp, pick_version(catalog["plugins"][vp]["vulnerable"], rng), "vulnerable"),
+        (op, pick_version(catalog["plugins"][op]["outdated"], rng), "outdated"),
     ]
     themes = [
-        (vt, pick_version(catalog["themes"][vt]["vulnerable"]), "vulnerable"),
-        (ot, pick_version(catalog["themes"][ot]["outdated"]), "outdated"),
+        (vt, pick_version(catalog["themes"][vt]["vulnerable"], rng), "vulnerable"),
+        (ot, pick_version(catalog["themes"][ot]["outdated"], rng), "outdated"),
     ]
     rng.shuffle(plugins)
     rng.shuffle(themes)
