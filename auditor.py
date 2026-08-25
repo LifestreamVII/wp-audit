@@ -72,8 +72,8 @@ def audit_site(name: str, host: str, username: str, password: str | None, port: 
         for slug in mu_plugin_map:
             if slug in plugin_map:
                 continue  # skip if already processed in regular plugins
-            plugin_versions[slug] = probe_content_version(client, directory, "plugin", slug)
-            plugin_versions_latest[slug] = get_content_latest_version(slug, "plugin")
+            plugin_versions[slug] = probe_content_version(client, directory, "mu-plugin", slug)
+            plugin_versions_latest[slug] = get_content_latest_version(slug, "mu-plugin")
 
         # ── 5. Discover themes ────────────────────────────────────────────────
         log.info("  🔎 Discovering themes…")
@@ -117,6 +117,19 @@ def audit_site(name: str, host: str, username: str, password: str | None, port: 
         if plugin_versions_latest.get(slug) is None:
             components_errors[slug] = f"Could not fetch latest version for {slug}."
 
+    # MU-Plugins
+    for slug, display_name in mu_plugin_map.items():
+        components.append(Component(
+            kind="plugin",
+            slug=slug,
+            name=display_name,
+            version=plugin_versions.get(slug),
+            version_source="readme.txt" if plugin_versions.get(slug) else "not-detected",
+            latest_version=plugin_versions_latest.get(slug),
+        ))
+        if plugin_versions_latest.get(slug) is None:
+            components_errors[slug] = f"Could not fetch latest version for {slug}."
+
     # Themes
     for slug, display_name in theme_map.items():
         components.append(Component(
@@ -135,7 +148,7 @@ def audit_site(name: str, host: str, username: str, password: str | None, port: 
     for comp in components:
         if comp.kind == "core":
             all_vulns = fetch_vulnerabilities("core", comp.slug)
-        elif comp.kind == "plugin":
+        elif comp.kind in ["plugin", "mu-plugin"]:
             all_vulns = fetch_vulnerabilities("plugin", comp.slug)
         elif comp.kind == "theme":
             all_vulns = fetch_vulnerabilities("theme", comp.slug)

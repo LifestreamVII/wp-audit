@@ -106,7 +106,7 @@ def probe_content_version(client: paramiko.SSHClient, directory: str, kind: str,
     theme to extract its version string via SSH.
     """
     if has_wp_cli(client) and not DISABLE_WP_CLI:
-        if kind == "plugin":
+        if kind in ["plugin", "mu-plugin"]:
             output = run_ssh_command(client, f"cd {shlex.quote(directory)} && wp plugin get {shlex.quote(slug)} --field=version 2>/dev/null")
         elif kind == "theme":
             output = run_ssh_command(client, f"cd {shlex.quote(directory)} && wp theme get {shlex.quote(slug)} --field=version 2>/dev/null")
@@ -132,7 +132,7 @@ def probe_content_version(client: paramiko.SSHClient, directory: str, kind: str,
                 return m.group(1).strip()
 
     # 2. Try "Version:" header in the main plugin PHP file
-    if kind == "plugin":
+    if kind in ["plugin", "mu-plugin"]:
         php_pattern = f"{base}/*.php"
         php_pattern_quoted = shlex.quote(php_pattern)
         main_php = run_ssh_command(
@@ -151,7 +151,7 @@ def get_content_latest_version(slug: str, kind: str) -> Optional[tuple[str, str]
     Query the WordPress.org API to get the latest version of a plugin or theme.
     Returns the version string and last updated timestamp, or None if not found.
     """
-    if kind == "plugin":
+    if kind in ["plugin", "mu-plugin"]:
         url = f"{WP_PLUGIN_API_BASE}?action=plugin_information&slug={slug}"
     elif kind == "theme":
         url = f"{WP_THEME_API_BASE}?action=theme_information&slug={slug}"
@@ -212,8 +212,8 @@ def extract_plugins(client: paramiko.SSHClient, directory: str, mu: bool = False
             continue
         if slug.startswith("."):
             continue  # skip hidden files/directories
-        if slug.endswith(".php"):
-            continue  # skip single-file plugins
+        if slug is "index.php" or slug is "hello.php":
+            continue # skip 'Silence is golden' and Hello Dolly plugin
         # Try to get the Plugin Name from the main PHP header
         php_pattern = f"{plugins_dir}/{slug}/*.php"
         php_pattern_quoted = shlex.quote(php_pattern)
