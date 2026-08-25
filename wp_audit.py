@@ -15,6 +15,7 @@ Usage:
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 from state import State, Diff
@@ -100,9 +101,19 @@ Examples:
     d = None
     try:
         state = State(output_dir / "state.json").load()
+        if state.last_run is None:
+            log.warning("Could not load state.json or no previous run found — starting fresh.")
+            os.makedirs(os.path.dirname(output_dir / "state.json"), exist_ok=True)
+            with (output_dir / "state.json").open("w", encoding="utf-8") as f:
+                f.write("{}")
+                f.close()
+            del state
+            state = State(output_dir / "state.json").load()
         d = Diff(state)
-    except Exception:
-        log.warning("Could not load state.json — starting fresh.")
+    except Exception as e:
+        log.error("Could not create/load state.json — aborting.")
+        log.exception(f"Error details: {e}")
+        sys.exit(1)
 
     log.info("WordPress Audit — %d site(s) to audit", len(sites))
     log.info("Reports will be saved to: %s/", output_dir)
