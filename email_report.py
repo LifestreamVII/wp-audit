@@ -399,5 +399,6 @@ def send_digest_email(
             server.login(SMTP_USER, SMTP_PASSWORD)
             server.sendmail(EMAIL_SENDER, EMAIL_RECIPIENT, msg.as_string())
         log.info("📧 ✅ Summary email sent successfully.")
-    except smtplib.SMTPException:
-        log.exception("📧 ❌ Failed to send summary email.")
+    except Exception as e:
+            print("[error] 📧 ❌ Failed to send summary email.")
+            print(f"[error] Connection to SMTP server failed: {e}")
