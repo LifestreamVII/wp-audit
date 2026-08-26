@@ -2,6 +2,7 @@
 auditor.py — Core site audit orchestration for wp_audit.
 """
 
+import json
 import shlex
 from datetime import datetime as dt, timezone
 from typing import Optional
@@ -197,9 +198,23 @@ def audit_site(name: str, host: str, username: str, password: str | None, port: 
                 LLM_PROMPT
             )
             try:
-                log_summary = llm_client.generate(prompt=result.logs, max_tokens=4096)
-                result.log_analysis = log_summary.replace('\n', ' ').replace('\r', '')
-                log.info("  ✓ Log analysis completed.")
+                raw_response = llm_client.generate(prompt=result.logs, max_tokens=4096)
+                # Expect JSON: {"summary": "...", "novelty_score": 0.x}
+                try:
+                    parsed = json.loads(raw_response)
+                    result.log_analysis = str(parsed.get("summary", "")).replace('\n', ' ').replace('\r', '')
+                    score = parsed.get("novelty_score")
+                    if isinstance(score, (int, float)):
+                        result.log_novelty_score = float(max(0.0, min(1.0, score)))
+                    else:
+                        result.log_novelty_score = None
+                    log.info("  ✓ Log analysis completed (novelty_score=%.2f).", result.log_novelty_score or 0)
+                except (json.JSONDecodeError, ValueError):
+                    # Graceful fallback: treat entire response as plain-text summary
+                    log.warning("  ⚠  LLM did not return valid JSON; using raw output as summary.")
+                    result.log_analysis = raw_response.replace('\n', ' ').replace('\r', '')
+                    result.log_novelty_score = None
+                    log.info("  ✓ Log analysis completed (no novelty_score).")
                 
             except Exception as e:
                 log.error("  ✗ Error occurred while analyzing logs with LLM: %s", str(e))

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Optional
 
 from models import Component, SiteAuditResult, Vulnerability
+from config import LOG_NOVELTY_THRESHOLD
 
 _CVE_RE = re.compile(r"CVE-\d{4}-\d{4,}", re.IGNORECASE)
 
@@ -147,7 +148,12 @@ def _short_hash(text: str) -> str:
 
 
 def fingerprint(result: SiteAuditResult) -> str:
-    """Hash of everything that matters — if this matches, nothing changed."""
+    """Hash of everything that matters — if this matches, nothing changed.
+
+    Note: debug.log content is intentionally excluded from the fingerprint.
+    Log novelty is evaluated separately via the LLM novelty_score so that
+    a growing log file does not force a fingerprint change every run.
+    """
     raw = json.dumps({
         "wp": result.wp_version,
         "comps": sorted((c.slug, c.version) for c in result.components),
@@ -157,7 +163,6 @@ def fingerprint(result: SiteAuditResult) -> str:
             for v in c.vulnerabilities
         ),
         "comp_errors": sorted(result.components_errors),
-        "logs": result.logs[0] if result.logs else None,
     }, sort_keys=True)
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
@@ -171,7 +176,6 @@ def gen_issueid(
     *,
     component: Optional[Component] = None,
     vulnerability: Optional[Vulnerability] = None,
-    log_line: Optional[str] = None,
     site_name: Optional[str] = None,
 ) -> str:
     """Generate a deterministic, stable issue ID for state tracking.
@@ -182,7 +186,7 @@ def gen_issueid(
         ───────────────     ──────────────────────────────────────
         Vulnerability       vuln|{kind}|{slug}|{CVE-or-hash}
         Outdated component  outdated|{kind}|{slug}
-        Log finding         log|{short_hash}
+        Log finding         log|{site_name}
         Unreachable site    unreachable|{site_name}
     """
 
@@ -201,10 +205,10 @@ def gen_issueid(
         return f"outdated|{component.kind}|{component.slug}"
 
     elif finding_type == "log":
-        if log_line is None:
-            raise ValueError("gen_issueid('log') requires log_line")
-        return f"log|{_short_hash(log_line)}"
-    
+        if site_name is None:
+            raise ValueError("gen_issueid('log') requires site_name")
+        return f"log|{site_name}"
+
     elif finding_type == "fail":
         if component is None:
             raise ValueError("gen_issueid('fail') requires component")
@@ -290,19 +294,25 @@ def build_issues(result: SiteAuditResult, now: str) -> dict[str, Issue]:
                 )
 
     # ── Log findings ──────────────────────────────────────────────────
-    if result.logs and len(result.logs) > 0:
-        log_line = result.logs[0] or None
-        if log_line is not None:
-            iid = gen_issueid("log", log_line=log_line)
-            detail = result.log_analysis or "Review log entry"
-            issues[iid] = Issue(
-                id=iid,
-                severity="unknown",
-                component="debug.log",
-                detail=detail,
-                action="Review log entry",
-                first_seen=now,
-            )
+    # We only emit a log issue when the LLM considers the current log to have
+    # new meaningful entries (novelty_score >= threshold).  A None score
+    # (LLM unavailable / parse error) is treated conservatively as novel so
+    # that real problems are never silently swallowed.
+    has_logs = bool(result.logs)
+    score = result.log_novelty_score  # float 0–1, or None
+    is_novel = has_logs and (score is None or score >= LOG_NOVELTY_THRESHOLD)
+    if is_novel:
+        iid = gen_issueid("log", site_name=result.name)
+        detail = result.log_analysis or "Review debug.log — potential new entries detected"
+        severity = "high" if (score is not None and score >= 0.7) else "medium"
+        issues[iid] = Issue(
+            id=iid,
+            severity=severity,
+            component="debug.log",
+            detail=detail,
+            action="Review debug.log for new security-relevant entries",
+            first_seen=now,
+        )
 
     return issues
 
@@ -406,9 +416,6 @@ class Diff:
             self._existing.append((site, issue))
 
         for iid in sorted(old_ids - current_ids):            # RESOLVED
-            if iid.startswith("log|"):
-                # don't report logs as resolved
-                continue
             self._resolved.append((site, old_issues[iid]))
 
         self._new_sites[site] = SiteSnapshot(

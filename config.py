@@ -39,8 +39,19 @@ LLM_MODEL = "gemma3:4b"  # Model for LLMClient
 LLM_BASE_URL = "http://localhost:11434/v1/"  # Base URL for LLMClient
 LLM_API_KEY = "ollama"
 LLM_PROMPT = (
-    "You are a WordPress security expert. Analyze the following logs and provide a short summary (max 2800 chars. if there are a lot of problematic entries) stating potential security issues in the WordPress site. Stay concise and assume the reader is a security professional. If there is a solution, mention it briefly in one or two sentences. Do not provide any other information or commentary."
+    "You are a WordPress security expert. Analyze the following WordPress debug.log entries and respond with ONLY a JSON object "
+    "(no markdown, no extra text) in this exact format:\n"
+    '{"summary": "<concise security analysis, max 2800 chars>", "novelty_score": <float 0.0-1.0>}\n\n'
+    "The `novelty_score` must reflect how certain you are that these logs contain NEW meaningful security-relevant "
+    "entries compared to what would typically be seen in a previous audit snapshot: "
+    "1.0 = definitely new critical/high issues present, "
+    "0.5 = ambiguous or routine warnings, "
+    "0.0 = no meaningful new entries (only notices, deprecations, or benign repeated lines). "
+    "The summary should state potential security issues concisely for a security professional. "
+    "If a mitigation exists, mention it in one or two sentences."
 )
+# Minimum novelty_score for a log finding to be treated as a NEW issue (vs. unchanged/resolved).
+LOG_NOVELTY_THRESHOLD = 0.4
 
 # ---------------------------------------------------------------------------
 # Email / SMTP

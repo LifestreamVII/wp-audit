@@ -69,6 +69,7 @@ class SiteAuditResult:
     wp_version: Optional[str]
     logs: Optional[list[str]]
     log_analysis: Optional[str]
+    log_novelty_score: Optional[float] = None  # 0.0–1.0; LLM certainty of new meaningful log entries
     wp_version_source: str
     components: list[Component] = field(default_factory=list)
     components_errors: dict[str, str] = field(default_factory=dict)
