@@ -8,7 +8,8 @@ def reverse_readline(fh: io.TextIOWrapper, buf_size=8192, limit=DEBUG_LOG_CAP):
     offset = 0
     fh.seek(0, os.SEEK_END)
     file_size = remaining_size = fh.tell()
-    while remaining_size > 0 and (limit is None or offset < limit):
+    count = 0
+    while remaining_size > 0 and (limit is None or count < limit):
         offset = min(file_size, offset + buf_size)
         fh.seek(file_size - offset)
         buffer = fh.read(min(remaining_size, buf_size))
@@ -24,8 +25,11 @@ def reverse_readline(fh: io.TextIOWrapper, buf_size=8192, limit=DEBUG_LOG_CAP):
         lines = lines[1:]
         # yield lines in this chunk except the segment
         for line in reversed(lines):
-            # only decode on a parsed line, to avoid utf-8 decode error
+            if limit is not None and count >= limit:
+                return
             yield line.decode()
+            count += 1
     # Don't yield None if the file was empty
     if segment is not None:
-        yield segment.decode()
+        if limit is None or count < limit:
+            yield segment.decode()
