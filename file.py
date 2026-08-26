@@ -2,7 +2,7 @@ import os
 import io
 from config import DEBUG_LOG_CAP
 
-def reverse_readline(fh: io.TextIOWrapper, buf_size=8192, limit=DEBUG_LOG_CAP):
+def reverse_readline(fh: io.RawIOBase, buf_size=8192, limit=DEBUG_LOG_CAP):
     """A generator that returns the lines of a file in reverse order"""
     segment = None
     offset = 0
