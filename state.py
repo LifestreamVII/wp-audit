@@ -376,7 +376,7 @@ class Diff:
         self._new_sites[site] = SiteSnapshot(
             fingerprint="",
             last_checked=self._now,
-            issues={iid: iss for iid, iss in current.items() if not iid.startswith("fail|")},
+            issues={iid: iss for iid, iss in current.items()},
         )
 
     def _add_unchanged(self, site: str, old_snap: SiteSnapshot) -> None:
@@ -414,7 +414,7 @@ class Diff:
         self._new_sites[site] = SiteSnapshot(
             fingerprint=fp,
             last_checked=self._now,
-            issues={iid: iss for iid, iss in current.items() if not iid.startswith("fail|")},
+            issues={iid: iss for iid, iss in current.items()},
         )
 
     # -- Finalize ----------------------------------------------------------
