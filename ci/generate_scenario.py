@@ -64,12 +64,14 @@ def main() -> None:
 
     core_version = rng.choice(sorted(catalog["cores"].keys()))
 
-    # Pick one vulnerable plugin + theme, then one DISTINCT outdated each.
-    vuln_plugins = sorted(catalog["plugins"])
+    # Pick one vulnerable plugin + theme, then one different outdated plugin + theme.
+    vuln_plugins = sorted([p for p in catalog["plugins"] if catalog["plugins"][p].get("vulnerable")])
+    safe_plugins = sorted([p for p in catalog["plugins"] if not catalog["plugins"][p].get("vulnerable")])
     vuln_themes = sorted(catalog["themes"])
 
     vp = rng.choice(vuln_plugins)
     vt = rng.choice(vuln_themes)
+    sp = rng.choice(safe_plugins) if safe_plugins else None
 
     out_plugins = [s for s in vuln_plugins if s != vp]
     out_themes = [s for s in vuln_themes if s != vt]
@@ -79,6 +81,7 @@ def main() -> None:
     plugins = [
         (vp, pick_version(catalog["plugins"][vp]["vulnerable"], rng), "vulnerable"),
         (op, pick_version(catalog["plugins"][op]["outdated"], rng), "outdated"),
+        (sp, pick_version(catalog["plugins"][sp]["patched"], rng), "safe") if sp else None,
     ]
     themes = [
         (vt, pick_version(catalog["themes"][vt]["vulnerable"], rng), "vulnerable"),

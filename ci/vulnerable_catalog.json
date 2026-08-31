@@ -21,6 +21,11 @@
       "vulnerable": ["9.7.1"],
       "outdated": ["10.9"],
       "note": "< 9.8"
+    },
+    "snow-fall": {
+      "name": "Snow Fall",
+      "patched": ["1.0.2"],
+      "note": "Unvulnerable/safe component"
     }
   },
   "themes": {
