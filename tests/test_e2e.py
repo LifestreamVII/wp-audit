@@ -73,7 +73,7 @@ def test_plugin_vulnerabilities_found(state, scenario):
     issues = _issues_for(state, scenario["site_name"])
     for p in scenario["plugins"]:
         prefix = f"vuln|plugin|{p['slug']}|"
-        outdated_prefix = f"outdated|plugin|{p['slug']}|"
+        outdated_prefix = f"outdated|plugin|{p['slug']}"
         if p["expect"] == "vulnerable":
             assert any(iid.startswith(prefix) for iid in issues), \
                 f"expected plugin vuln issue ({prefix}*) — got: {sorted(issues)}"
@@ -82,7 +82,7 @@ def test_plugin_vulnerabilities_found(state, scenario):
                 f"expected no safe plugin issues ({prefix}*) — got: {sorted(issues)}"
         elif p["expect"] == "outdated":
             assert any(iid.startswith(outdated_prefix) for iid in issues), \
-                f"expected outdated plugin issue ({outdated_prefix}*) — got: {sorted(issues)}"
+                f"expected outdated plugin issue ({outdated_prefix}) — got: {sorted(issues)}"
 
 def test_theme_vulnerabilities_found(state, scenario):
     issues = _issues_for(state, scenario["site_name"])
