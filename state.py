@@ -358,14 +358,34 @@ class Diff:
     # -- Per-site entry point ----------------------------------------------
 
     def add(self, result: SiteAuditResult) -> None:
-        """Diff a single site result against its previous state."""
+        """Diff a single site result against its previous state.
+
+        The structural fingerprint (WP version, plugins, vulns) and the log
+        novelty gate (LLM novelty_score) are intentionally independent — logs
+        are excluded from fingerprint() by design.  We therefore re-evaluate
+        the log issue separately even when the structural fingerprint matches,
+        so that new or resolved debug.log findings are never silently swallowed
+        by the unchanged path.
+        """
         site = result.name
         old_snap = self._state.sites.get(site)
 
         if not result.reachable:
             self._add_errored(site, result, old_snap)
         elif old_snap and old_snap.fingerprint == fingerprint(result):
-            self._add_unchanged(site, old_snap)
+            # Structural audit (WP/plugins/vulns) is unchanged.  Still check
+            # whether the log issue status changed independently, because
+            # debug.log is excluded from the fingerprint by design.
+            log_iid = f"log|{site}"
+            old_has_log = log_iid in old_snap.issues
+            new_has_log = log_iid in build_issues(result, self._now)
+            if old_has_log == new_has_log:
+                # Log status also unchanged — truly nothing to report.
+                self._add_unchanged(site, old_snap)
+            else:
+                # Log issue appeared or disappeared — surface it via the normal
+                # changed path so new/resolved entries show up in the report.
+                self._add_changed(site, result, old_snap)
         else:
             self._add_changed(site, result, old_snap)
         
