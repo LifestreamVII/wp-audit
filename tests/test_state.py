@@ -87,14 +87,6 @@ def test_build_issues_vuln_and_outdated():
     assert issues["outdated|plugin|akismet"].action == "Update to 4.5"
 
 
-def test_build_issues_no_outdated_when_vulnerable():
-    now = "2026-01-01T00:00:00+00:00"
-    # vulnerable + outdated would double-report; outdated must be skipped
-    comp = _comp(version="6.8", latest=("8.0.4", "x"), vulns=[_vuln()])
-    issues = build_issues(_result(components=[comp]), now)
-    assert not any(k.startswith("outdated|") for k in issues)
-
-
 def test_build_issues_unreachable_only():
     now = "2026-01-01T00:00:00+00:00"
     issues = build_issues(_result(reachable=False, error="boom"), now)

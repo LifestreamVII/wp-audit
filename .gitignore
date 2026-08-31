@@ -5,3 +5,4 @@ venv/
 .coverage
 htmlcov/
 ci/run/
+.venv/
