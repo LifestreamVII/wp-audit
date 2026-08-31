@@ -18,7 +18,7 @@ from wp_detection import detect_wp_version, extract_plugins, extract_themes, pro
 # Site auditor
 # ---------------------------------------------------------------------------
 
-def audit_site(name: str, host: str, username: str, password: str | None, port: int, key: str | None, directory: str, url: str, skip_logs: bool = False, known_hosts_file: str | None = None) -> SiteAuditResult:
+def audit_site(name: str, host: str, username: str, password: str | None, port: int, key: str | None, directory: str, url: str, skip_logs: bool = False, known_hosts_file: str | None = None, prev_log_detail: str | None = None) -> SiteAuditResult:
     now = dt.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     log.info("━━━━ Auditing: %s (%s)", name, host)
 
@@ -198,7 +198,12 @@ def audit_site(name: str, host: str, username: str, password: str | None, port: 
                 LLM_PROMPT
             )
             try:
-                raw_response = llm_client.generate(prompt=result.logs, max_tokens=4096)
+                llm_prompt_parts = list(result.logs)
+                if prev_log_detail:
+                    llm_prompt_parts.append(
+                        f"\n\n--- PREVIOUS LOG ANALYSIS ---\n{prev_log_detail}\n--- END PREVIOUS LOG ANALYSIS ---"
+                    )
+                raw_response = llm_client.generate(prompt=llm_prompt_parts, max_tokens=4096)
                 # Expect JSON: {"summary": "...", "novelty_score": 0.x}
                 if raw_response and raw_response.strip().startswith("```json"):
                     # Some models may return code block formatting; strip it if present

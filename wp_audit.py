@@ -133,7 +133,18 @@ Examples:
             continue
 
         try:
-            result = audit_site(name, host, username, password, port, key, directory, url, skip_logs=args.no_logs, known_hosts_file=args.known_hosts_file)
+            # Look up the previous log issue detail for this site (if any) so the
+            # LLM can compare the current logs against a concrete previous analysis
+            # rather than guessing what "typical" looks like.
+            prev_log_detail: str | None = None
+            if state is not None:
+                old_snap = state.sites.get(name)
+                if old_snap:
+                    log_issue = old_snap.issues.get(f"log|{name}")
+                    if log_issue:
+                        prev_log_detail = log_issue.detail
+
+            result = audit_site(name, host, username, password, port, key, directory, url, skip_logs=args.no_logs, known_hosts_file=args.known_hosts_file, prev_log_detail=prev_log_detail)
             if d is not None:
                 d.add(result)
         except Exception as exc:

@@ -364,8 +364,12 @@ class Diff:
         novelty gate (LLM novelty_score) are intentionally independent — logs
         are excluded from fingerprint() by design.  We therefore re-evaluate
         the log issue separately even when the structural fingerprint matches,
-        so that new or resolved debug.log findings are never silently swallowed
-        by the unchanged path.
+        so that debug.log changes are never silently swallowed by the unchanged
+        path.
+
+        A log issue is only considered RESOLVED when result.logs is empty/None
+        (the file has been cleared or removed).  A low novelty score on a
+        non-empty log means the issue is EXISTING, not resolved.
         """
         site = result.name
         old_snap = self._state.sites.get(site)
@@ -423,6 +427,17 @@ class Diff:
         fp = fingerprint(result)
         current = build_issues(result, self._now)
         old_issues = old_snap.issues if old_snap else {}
+
+        # If a log issue existed previously and the site still has log entries,
+        # but the LLM novelty score fell below the threshold (e.g. identical
+        # debug.log), the issue is NOT resolved — the underlying log problems
+        # are still there.  Carry the old issue forward so the set arithmetic
+        # below classifies it as EXISTING rather than RESOLVED.
+        # True resolution only happens when result.logs is empty/None (the file
+        # is gone or has been cleared).
+        log_iid = f"log|{site}"
+        if log_iid not in current and log_iid in old_issues and result.logs:
+            current[log_iid] = old_issues[log_iid]
 
         current_ids = set(current.keys())
         old_ids     = set(old_issues.keys())
