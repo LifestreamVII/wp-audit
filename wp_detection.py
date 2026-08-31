@@ -212,7 +212,7 @@ def extract_plugins(client: paramiko.SSHClient, directory: str, mu: bool = False
             continue
         if slug.startswith("."):
             continue  # skip hidden files/directories
-        if slug is "index.php" or slug is "hello.php":
+        if slug == "index.php" or slug == "hello.php":
             continue # skip 'Silence is golden' and Hello Dolly plugin
         # Try to get the Plugin Name from the main PHP header
         php_pattern = f"{plugins_dir}/{slug}/*.php"
