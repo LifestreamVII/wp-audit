@@ -200,6 +200,9 @@ def audit_site(name: str, host: str, username: str, password: str | None, port: 
             try:
                 raw_response = llm_client.generate(prompt=result.logs, max_tokens=4096)
                 # Expect JSON: {"summary": "...", "novelty_score": 0.x}
+                if raw_response and raw_response.strip().startswith("```json"):
+                    # Some models may return code block formatting; strip it if present
+                    raw_response = raw_response.strip().lstrip("```json").rstrip("```").strip()
                 try:
                     parsed = json.loads(raw_response)
                     result.log_analysis = str(parsed.get("summary", "")).replace('\n', ' ').replace('\r', '')
