@@ -2,6 +2,7 @@
 auditor.py — Core site audit orchestration for wp_audit.
 """
 
+import json
 import shlex
 from datetime import datetime as dt, timezone
 from typing import Optional
@@ -17,7 +18,7 @@ from wp_detection import detect_wp_version, extract_plugins, extract_themes, pro
 # Site auditor
 # ---------------------------------------------------------------------------
 
-def audit_site(name: str, host: str, username: str, password: str | None, port: int, key: str | None, directory: str, url: str, skip_logs: bool = False, known_hosts_file: str | None = None) -> SiteAuditResult:
+def audit_site(name: str, host: str, username: str, password: str | None, port: int, key: str | None, directory: str, url: str, skip_logs: bool = False, known_hosts_file: str | None = None, prev_log_detail: str | None = None) -> SiteAuditResult:
     now = dt.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     log.info("━━━━ Auditing: %s (%s)", name, host)
 
@@ -72,8 +73,8 @@ def audit_site(name: str, host: str, username: str, password: str | None, port: 
         for slug in mu_plugin_map:
             if slug in plugin_map:
                 continue  # skip if already processed in regular plugins
-            plugin_versions[slug] = probe_content_version(client, directory, "plugin", slug)
-            plugin_versions_latest[slug] = get_content_latest_version(slug, "plugin")
+            plugin_versions[slug] = probe_content_version(client, directory, "mu-plugin", slug)
+            plugin_versions_latest[slug] = get_content_latest_version(slug, "mu-plugin")
 
         # ── 5. Discover themes ────────────────────────────────────────────────
         log.info("  🔎 Discovering themes…")
@@ -117,6 +118,19 @@ def audit_site(name: str, host: str, username: str, password: str | None, port: 
         if plugin_versions_latest.get(slug) is None:
             components_errors[slug] = f"Could not fetch latest version for {slug}."
 
+    # MU-Plugins
+    for slug, display_name in mu_plugin_map.items():
+        components.append(Component(
+            kind="plugin",
+            slug=slug,
+            name=display_name,
+            version=plugin_versions.get(slug),
+            version_source="readme.txt" if plugin_versions.get(slug) else "not-detected",
+            latest_version=plugin_versions_latest.get(slug),
+        ))
+        if plugin_versions_latest.get(slug) is None:
+            components_errors[slug] = f"Could not fetch latest version for {slug}."
+
     # Themes
     for slug, display_name in theme_map.items():
         components.append(Component(
@@ -135,7 +149,7 @@ def audit_site(name: str, host: str, username: str, password: str | None, port: 
     for comp in components:
         if comp.kind == "core":
             all_vulns = fetch_vulnerabilities("core", comp.slug)
-        elif comp.kind == "plugin":
+        elif comp.kind in ["plugin", "mu-plugin"]:
             all_vulns = fetch_vulnerabilities("plugin", comp.slug)
         elif comp.kind == "theme":
             all_vulns = fetch_vulnerabilities("theme", comp.slug)
@@ -184,9 +198,31 @@ def audit_site(name: str, host: str, username: str, password: str | None, port: 
                 LLM_PROMPT
             )
             try:
-                log_summary = llm_client.generate(prompt=result.logs, max_tokens=4096)
-                result.log_analysis = log_summary.replace('\n', ' ').replace('\r', '')
-                log.info("  ✓ Log analysis completed.")
+                llm_prompt_parts = list(result.logs)
+                if prev_log_detail:
+                    llm_prompt_parts.append(
+                        f"\n\n--- PREVIOUS LOG ANALYSIS ---\n{prev_log_detail}\n--- END PREVIOUS LOG ANALYSIS ---"
+                    )
+                raw_response = llm_client.generate(prompt=llm_prompt_parts, max_tokens=4096)
+                # Expect JSON: {"summary": "...", "novelty_score": 0.x}
+                if raw_response and raw_response.strip().startswith("```json"):
+                    # Some models may return code block formatting; strip it if present
+                    raw_response = raw_response.strip().lstrip("```json").rstrip("```").strip()
+                try:
+                    parsed = json.loads(raw_response)
+                    result.log_analysis = str(parsed.get("summary", "")).replace('\n', ' ').replace('\r', '')
+                    score = parsed.get("novelty_score")
+                    if isinstance(score, (int, float)):
+                        result.log_novelty_score = float(max(0.0, min(1.0, score)))
+                    else:
+                        result.log_novelty_score = None
+                    log.info("  ✓ Log analysis completed (novelty_score=%.2f).", result.log_novelty_score or 0)
+                except (json.JSONDecodeError, ValueError):
+                    # Graceful fallback: treat entire response as plain-text summary
+                    log.warning("  ⚠  LLM did not return valid JSON; using raw output as summary.")
+                    result.log_analysis = raw_response.replace('\n', ' ').replace('\r', '')
+                    result.log_novelty_score = None
+                    log.info("  ✓ Log analysis completed (no novelty_score).")
                 
             except Exception as e:
                 log.error("  ✗ Error occurred while analyzing logs with LLM: %s", str(e))

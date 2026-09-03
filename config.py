@@ -39,8 +39,24 @@ LLM_MODEL = "gemma3:4b"  # Model for LLMClient
 LLM_BASE_URL = "http://localhost:11434/v1/"  # Base URL for LLMClient
 LLM_API_KEY = "ollama"
 LLM_PROMPT = (
-    "You are a WordPress security expert. Analyze the following logs and provide a short summary (max 2800 chars. if there are a lot of problematic entries) stating potential security issues in the WordPress site. Stay concise and assume the reader is a security professional. If there is a solution, mention it briefly in one or two sentences. Do not provide any other information or commentary."
+    "You are a WordPress security expert. Analyze the following WordPress debug.log entries and respond with ONLY a JSON object "
+    "(no markdown, no extra text) EXACTLY in this format:\n"
+    '{"summary": "<concise security analysis, max 2800 chars>", "novelty_score": <float 0.0-1.0>}\n\n'
+    "The user message contains the current log entries to analyse. "
+    "It may also include a 'PREVIOUS LOG ANALYSIS' section showing the summary produced during the last audit run for this site. "
+    "When that section is present, use it as the baseline: the `novelty_score` must reflect how certain you are that the "
+    "CURRENT logs contain NEW meaningful security-relevant entries COMPARED TO that previous analysis. "
+    "When no previous analysis is provided, score based on whether the CURRENT logs contain any meaningful security-relevant entries at all."
+    "Score guide: "
+    "1.0 = definitely new critical/high issues not covered by the previous analysis, or against what is to be expected in a WordPress debug.log."
+    "0.5 = ambiguous, routine warnings, or unclear whether they appeared before."
+    "0.0 = nothing new beyond what the previous analysis already described (only notices, deprecations, or identical repeated lines). "
+    "The summary should state potential security issues concisely for a security professional. "
+    "If a mitigation exists, mention it in one or two sentences."
+    "Follow the JSON format strictly, and do not include any other text or commentary."
 )
+# Minimum novelty_score for a log finding to be treated as a NEW issue (vs. unchanged/resolved).
+LOG_NOVELTY_THRESHOLD = 0.4
 
 # ---------------------------------------------------------------------------
 # Email / SMTP

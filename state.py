@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Optional
 
 from models import Component, SiteAuditResult, Vulnerability
+from config import LOG_NOVELTY_THRESHOLD
 
 _CVE_RE = re.compile(r"CVE-\d{4}-\d{4,}", re.IGNORECASE)
 
@@ -147,7 +148,12 @@ def _short_hash(text: str) -> str:
 
 
 def fingerprint(result: SiteAuditResult) -> str:
-    """Hash of everything that matters — if this matches, nothing changed."""
+    """Hash of everything that matters — if this matches, nothing changed.
+
+    Note: debug.log content is intentionally excluded from the fingerprint.
+    Log novelty is evaluated separately via the LLM novelty_score so that
+    a growing log file does not force a fingerprint change every run.
+    """
     raw = json.dumps({
         "wp": result.wp_version,
         "comps": sorted((c.slug, c.version) for c in result.components),
@@ -157,7 +163,6 @@ def fingerprint(result: SiteAuditResult) -> str:
             for v in c.vulnerabilities
         ),
         "comp_errors": sorted(result.components_errors),
-        "logs": result.logs[0] if result.logs else None,
     }, sort_keys=True)
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
@@ -171,7 +176,6 @@ def gen_issueid(
     *,
     component: Optional[Component] = None,
     vulnerability: Optional[Vulnerability] = None,
-    log_line: Optional[str] = None,
     site_name: Optional[str] = None,
 ) -> str:
     """Generate a deterministic, stable issue ID for state tracking.
@@ -182,7 +186,7 @@ def gen_issueid(
         ───────────────     ──────────────────────────────────────
         Vulnerability       vuln|{kind}|{slug}|{CVE-or-hash}
         Outdated component  outdated|{kind}|{slug}
-        Log finding         log|{short_hash}
+        Log finding         log|{site_name}
         Unreachable site    unreachable|{site_name}
     """
 
@@ -201,10 +205,10 @@ def gen_issueid(
         return f"outdated|{component.kind}|{component.slug}"
 
     elif finding_type == "log":
-        if log_line is None:
-            raise ValueError("gen_issueid('log') requires log_line")
-        return f"log|{_short_hash(log_line)}"
-    
+        if site_name is None:
+            raise ValueError("gen_issueid('log') requires site_name")
+        return f"log|{site_name}"
+
     elif finding_type == "fail":
         if component is None:
             raise ValueError("gen_issueid('fail') requires component")
@@ -290,19 +294,25 @@ def build_issues(result: SiteAuditResult, now: str) -> dict[str, Issue]:
                 )
 
     # ── Log findings ──────────────────────────────────────────────────
-    if result.logs and len(result.logs) > 0:
-        log_line = result.logs[0] or None
-        if log_line is not None:
-            iid = gen_issueid("log", log_line=log_line)
-            detail = result.log_analysis or "Review log entry"
-            issues[iid] = Issue(
-                id=iid,
-                severity="unknown",
-                component="debug.log",
-                detail=detail,
-                action="Review log entry",
-                first_seen=now,
-            )
+    # We only emit a log issue when the LLM considers the current log to have
+    # new meaningful entries (novelty_score >= threshold).  A None score
+    # (LLM unavailable / parse error) is treated conservatively as novel so
+    # that real problems are never silently swallowed.
+    has_logs = bool(result.logs)
+    score = result.log_novelty_score  # float 0–1, or None
+    is_novel = has_logs and (score is None or score >= LOG_NOVELTY_THRESHOLD)
+    if is_novel:
+        iid = gen_issueid("log", site_name=result.name)
+        detail = result.log_analysis or "Review debug.log — potential new entries detected"
+        severity = "high" if (score is not None and score >= 0.7) else "medium"
+        issues[iid] = Issue(
+            id=iid,
+            severity=severity,
+            component="debug.log",
+            detail=detail,
+            action="Review debug.log for new security-relevant entries",
+            first_seen=now,
+        )
 
     return issues
 
@@ -348,14 +358,38 @@ class Diff:
     # -- Per-site entry point ----------------------------------------------
 
     def add(self, result: SiteAuditResult) -> None:
-        """Diff a single site result against its previous state."""
+        """Diff a single site result against its previous state.
+
+        The structural fingerprint (WP version, plugins, vulns) and the log
+        novelty gate (LLM novelty_score) are intentionally independent — logs
+        are excluded from fingerprint() by design.  We therefore re-evaluate
+        the log issue separately even when the structural fingerprint matches,
+        so that debug.log changes are never silently swallowed by the unchanged
+        path.
+
+        A log issue is only considered RESOLVED when result.logs is empty/None
+        (the file has been cleared or removed).  A low novelty score on a
+        non-empty log means the issue is EXISTING, not resolved.
+        """
         site = result.name
         old_snap = self._state.sites.get(site)
 
         if not result.reachable:
             self._add_errored(site, result, old_snap)
         elif old_snap and old_snap.fingerprint == fingerprint(result):
-            self._add_unchanged(site, old_snap)
+            # Structural audit (WP/plugins/vulns) is unchanged.  Still check
+            # whether the log issue status changed independently, because
+            # debug.log is excluded from the fingerprint by design.
+            log_iid = f"log|{site}"
+            old_has_log = log_iid in old_snap.issues
+            new_has_log = log_iid in build_issues(result, self._now)
+            if old_has_log == new_has_log:
+                # Log status also unchanged — truly nothing to report.
+                self._add_unchanged(site, old_snap)
+            else:
+                # Log issue appeared or disappeared — surface it via the normal
+                # changed path so new/resolved entries show up in the report.
+                self._add_changed(site, result, old_snap)
         else:
             self._add_changed(site, result, old_snap)
         
@@ -376,7 +410,7 @@ class Diff:
         self._new_sites[site] = SiteSnapshot(
             fingerprint="",
             last_checked=self._now,
-            issues={iid: iss for iid, iss in current.items() if not iid.startswith("fail|")},
+            issues={iid: iss for iid, iss in current.items()},
         )
 
     def _add_unchanged(self, site: str, old_snap: SiteSnapshot) -> None:
@@ -394,6 +428,17 @@ class Diff:
         current = build_issues(result, self._now)
         old_issues = old_snap.issues if old_snap else {}
 
+        # If a log issue existed previously and the site still has log entries,
+        # but the LLM novelty score fell below the threshold (e.g. identical
+        # debug.log), the issue is NOT resolved — the underlying log problems
+        # are still there.  Carry the old issue forward so the set arithmetic
+        # below classifies it as EXISTING rather than RESOLVED.
+        # True resolution only happens when result.logs is empty/None (the file
+        # is gone or has been cleared).
+        log_iid = f"log|{site}"
+        if log_iid not in current and log_iid in old_issues and result.logs:
+            current[log_iid] = old_issues[log_iid]
+
         current_ids = set(current.keys())
         old_ids     = set(old_issues.keys())
 
@@ -406,15 +451,12 @@ class Diff:
             self._existing.append((site, issue))
 
         for iid in sorted(old_ids - current_ids):            # RESOLVED
-            if iid.startswith("log|"):
-                # don't report logs as resolved
-                continue
             self._resolved.append((site, old_issues[iid]))
 
         self._new_sites[site] = SiteSnapshot(
             fingerprint=fp,
             last_checked=self._now,
-            issues={iid: iss for iid, iss in current.items() if not iid.startswith("fail|")},
+            issues={iid: iss for iid, iss in current.items()},
         )
 
     # -- Finalize ----------------------------------------------------------

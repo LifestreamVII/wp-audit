@@ -42,9 +42,11 @@ or `make unit` / `make e2e` / `make ci`.
 4. The real CLI audits the fixture:
    `python wp_audit.py --config ci/run/sites.generated.yaml --no-email --no-logs`
 5. `pytest -m e2e` asserts the artifacts: every expected finding type
-   (plugin vuln, theme vuln, core vuln, outdated version, debug.log finding,
-   unreachable host) plus a high/critical severity must appear in
+   from the CI harness run (plugin vuln, theme vuln, core vuln, outdated
+   version, unreachable host) plus a high/critical severity must appear in
    `ci/run/reports/state.json`, and the digest report must exist.
+   Because the harness calls `wp_audit.py` with `--no-logs`, debug.log
+   findings are intentionally not expected in e2e.
 
 Artifacts land in `ci/run/` (gitignored): `scenario.json`, `scenario.env`,
 `reports/` (markdown digest + `state.json`).

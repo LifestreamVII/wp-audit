@@ -15,6 +15,7 @@ Usage:
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 from state import State, Diff
@@ -100,9 +101,19 @@ Examples:
     d = None
     try:
         state = State(output_dir / "state.json").load()
+        if state.last_run is None:
+            log.warning("Could not load state.json or no previous run found — starting fresh.")
+            os.makedirs(os.path.dirname(output_dir / "state.json"), exist_ok=True)
+            with (output_dir / "state.json").open("w", encoding="utf-8") as f:
+                f.write("{}")
+                f.close()
+            del state
+            state = State(output_dir / "state.json").load()
         d = Diff(state)
-    except Exception:
-        log.warning("Could not load state.json — starting fresh.")
+    except Exception as e:
+        log.error("Could not create/load state.json — aborting.")
+        log.exception(f"Error details: {e}")
+        sys.exit(1)
 
     log.info("WordPress Audit — %d site(s) to audit", len(sites))
     log.info("Reports will be saved to: %s/", output_dir)
@@ -122,7 +133,18 @@ Examples:
             continue
 
         try:
-            result = audit_site(name, host, username, password, port, key, directory, url, skip_logs=args.no_logs, known_hosts_file=args.known_hosts_file)
+            # Look up the previous log issue detail for this site (if any) so the
+            # LLM can compare the current logs against a concrete previous analysis
+            # rather than guessing what "typical" looks like.
+            prev_log_detail: str | None = None
+            if state is not None:
+                old_snap = state.sites.get(name)
+                if old_snap:
+                    log_issue = old_snap.issues.get(f"log|{name}")
+                    if log_issue:
+                        prev_log_detail = log_issue.detail
+
+            result = audit_site(name, host, username, password, port, key, directory, url, skip_logs=args.no_logs, known_hosts_file=args.known_hosts_file, prev_log_detail=prev_log_detail)
             if d is not None:
                 d.add(result)
         except Exception as exc:

@@ -53,8 +53,7 @@ def test_issueid_vuln_without_cve_hashes_name():
 
 def test_issueid_outdated_log_fail_unreachable():
     assert gen_issueid("outdated", component=_comp()) == "outdated|plugin|wp-file-manager"
-    log_iid = gen_issueid("log", log_line="PHP Warning: something")
-    assert log_iid.startswith("log|")
+    assert gen_issueid("log", site_name="my site") == "log|my site"
     assert gen_issueid("fail", component=_comp()) == "fail|plugin|wp-file-manager"
     assert gen_issueid("unreachable", site_name="my site") == "unreachable|my site"
 
@@ -65,7 +64,7 @@ def test_issueid_requires_its_arguments():
     with pytest.raises(ValueError):
         gen_issueid("outdated")  # missing component
     with pytest.raises(ValueError):
-        gen_issueid("log")  # missing log_line
+        gen_issueid("log")  # missing site_name
     with pytest.raises(ValueError):
         gen_issueid("unreachable")  # missing site_name
     with pytest.raises(ValueError):
