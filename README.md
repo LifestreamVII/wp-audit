@@ -85,3 +85,14 @@ Arguments:
 - `--verbose`: enable verbose logs
 - `--no-email`: skip summary email sending
 - `--no-logs`: skip debug.log analysis and LLM summary
+
+## Testing & CI
+
+See [TESTING.md](./TESTING.md). TL;DR:
+
+```bash
+bash scripts/run_ci_locally.sh          # unit tests + e2e audit against a dockerized vulnerable WordPress
+bash scripts/run_ci_locally.sh --unit-only
+```
+
+`make ci` does the same. GitHub Actions runs the identical pipeline on every push/PR.

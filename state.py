@@ -280,7 +280,7 @@ def build_issues(result: SiteAuditResult, now: str) -> dict[str, Issue]:
             )
 
         # ── Outdated (no vuln, but behind on version) ─────────────────
-        if comp.latest_version and not comp.vulnerabilities:
+        if comp.latest_version:
             latest_ver, _ = comp.latest_version
             if comp.version and comp.version != latest_ver:
                 iid = gen_issueid("outdated", component=comp)
