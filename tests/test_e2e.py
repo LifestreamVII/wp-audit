@@ -125,6 +125,8 @@ def test_unreachable_site_tracked(state, scenario):
 
 
 def test_digest_report_generated():
+    if not SCENARIO.exists():
+        pytest.skip("e2e harness not run (missing ci/run/scenario.json)")
     reports = sorted(REPORTS.glob("Wordpress_Security_Audit_*.md"))
     assert reports, f"no digest report generated in {REPORTS}"
     text = reports[-1].read_text(encoding="utf-8")
