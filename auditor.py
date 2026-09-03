@@ -188,9 +188,9 @@ def audit_site(name: str, host: str, username: str, password: str | None, port: 
         log.info("  📝 Reconnecting for log collection…")
         client = client_connect(host, username, password, port, key, known_hosts_file)
         debug_log_path = f"{directory.rstrip('/')}/wp-content/debug.log"
-        result.logs = filter_logs(client, debug_log_path, inc_notices=True, td=2)
-        
-        if result.logs and not skip_logs:
+        if not skip_logs:
+            result.logs = filter_logs(client, debug_log_path, inc_notices=True, td=2)
+        if result.logs:
             log.info("  🧠 Analyzing logs with LLM…")
             llm_client = LLMClient(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
             llm_client.set_model(LLM_MODEL)
