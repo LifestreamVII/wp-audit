@@ -73,8 +73,12 @@ def test_extract_plugins_lists_and_names():
         "plugins/wp-file-manager/": "Plugin Name: File Manager",
     })
     plugins = wp_detection.extract_plugins(client, "/var/www/html")
-    assert plugins == {"akismet": "akismet", "wp-file-manager": "File Manager"}
-    # single-file plugin (single.php) and hidden dirs are skipped
+    assert plugins == {
+        "akismet": "akismet",
+        "wp-file-manager": "File Manager",
+        "single.php": "single.php",
+    }
+    # hidden dirs are skipped; single-file plugins are now included
 
 
 def test_extract_plugins_empty_dir_returns_none():
